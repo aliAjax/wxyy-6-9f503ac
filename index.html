@@ -15,6 +15,7 @@
       </div>
       <div class="header-actions">
         <button id="archiveBtn" type="button" class="archive-btn">修复档案</button>
+        <button id="tutorialBtn" type="button" class="tutorial-btn">📖 教学</button>
         <div class="stats">
           <span>时间 <strong id="timeLeft">90</strong></span>
           <span>挖掘 <strong id="digCount">0</strong></span>
@@ -102,6 +103,18 @@
       </div>
       <div class="modal-footer">
         <button id="clearArchiveBtn" type="button" class="clear-btn">清空记录</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="tutorialOverlay" class="tutorial-overlay hidden">
+    <div id="tutorialSpotlight" class="tutorial-spotlight"></div>
+    <div id="tutorialTooltip" class="tutorial-tooltip">
+      <div class="tutorial-step-indicator"></div>
+      <p class="tutorial-text"></p>
+      <div class="tutorial-actions">
+        <button type="button" class="tutorial-skip-btn">跳过教学</button>
+        <button type="button" class="tutorial-next-btn">下一步</button>
       </div>
     </div>
   </div>

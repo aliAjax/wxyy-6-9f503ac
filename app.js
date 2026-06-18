@@ -21,8 +21,13 @@ const cancelClearBtn = document.getElementById("cancelClearBtn");
 const confirmClearBtn = document.getElementById("confirmClearBtn");
 const recentRecordsEl = document.getElementById("recentRecords");
 const bestRecordsEl = document.getElementById("bestRecords");
+const tutorialBtn = document.getElementById("tutorialBtn");
+const tutorialOverlay = document.getElementById("tutorialOverlay");
+const tutorialSpotlight = document.getElementById("tutorialSpotlight");
+const tutorialTooltip = document.getElementById("tutorialTooltip");
 
 const ARCHIVE_STORAGE_KEY = "archaeology_archive_records";
+const TUTORIAL_STORAGE_KEY = "archaeology_tutorial_done";
 
 const levels = {
   bowl: {
@@ -306,6 +311,210 @@ function resetStatsDisplay(levelId) {
   progressEl.textContent = "0%";
 }
 
+const tutorial = {
+  steps: [
+    {
+      target: null,
+      text: "欢迎来到考古修复现场！接下来将带你了解发掘与修复的完整流程。",
+      arrow: null,
+      action: null
+    },
+    {
+      target: "#startBtn",
+      text: "点击「开始挖掘」启动计时，探方网格将变为可操作状态。",
+      arrow: "bottom",
+      action: "start"
+    },
+    {
+      target: "#grid",
+      text: "在探方网格中逐格点击进行挖掘，有的格子藏着碎片，有的只有泥土。试着点击任意一格进行挖掘吧！",
+      arrow: "right",
+      action: "dig"
+    },
+    {
+      target: "#pieces",
+      text: "太棒了！挖到碎片后，残片会出现在修复台右侧区域，等待你拖动修复。",
+      arrow: "left",
+      action: null
+    },
+    {
+      target: "#pieces",
+      text: "按住碎片拖动，将它移向修复台上对应的位置。试着拖动碎片到目标区域附近吧！",
+      arrow: "left",
+      action: "drag"
+    },
+    {
+      target: "#pieces",
+      text: "双击碎片可以旋转 45°，调整到正确角度才能贴合。双击碎片试试旋转吧！",
+      arrow: "left",
+      action: "rotate"
+    },
+    {
+      target: "#target",
+      text: "当碎片的角度和位置都对齐时，它会自动贴合到目标位置。集齐所有碎片即可完成修复！继续尝试将碎片放到正确位置吧。",
+      arrow: "right",
+      action: "snap"
+    },
+    {
+      target: null,
+      text: "教学完成！现在你已经掌握了考古修复的全部技巧，开始你的考古之旅吧。",
+      arrow: null,
+      action: null
+    }
+  ],
+
+  current: 0,
+  active: false,
+  waitingForAction: false,
+
+  isDone() {
+    return localStorage.getItem(TUTORIAL_STORAGE_KEY) === "true";
+  },
+
+  markDone() {
+    localStorage.setItem(TUTORIAL_STORAGE_KEY, "true");
+  },
+
+  reset() {
+    this.current = 0;
+    this.waitingForAction = false;
+  },
+
+  start(levelId = "bowl") {
+    if (this.active) return;
+    this.active = true;
+    this.reset();
+    
+    if (!currentLevel) {
+      selectLevel(levelId, true);
+    } else {
+      reset();
+      setTimeout(() => {
+        tutorialOverlay.classList.remove("hidden");
+        this.showStep();
+      }, 100);
+      return;
+    }
+    
+    setTimeout(() => {
+      tutorialOverlay.classList.remove("hidden");
+      this.showStep();
+    }, 500);
+  },
+
+  end() {
+    this.active = false;
+    this.waitingForAction = false;
+    tutorialOverlay.classList.add("hidden");
+    tutorialSpotlight.style.cssText = "";
+    tutorialTooltip.style.cssText = "";
+    this.markDone();
+  },
+
+  next() {
+    if (this.waitingForAction) return;
+    
+    this.current += 1;
+    if (this.current >= this.steps.length) {
+      this.end();
+      return;
+    }
+    this.showStep();
+  },
+
+  skip() {
+    this.end();
+  },
+
+  notifyAction(action) {
+    if (!this.active || !this.waitingForAction) return;
+    
+    const step = this.steps[this.current];
+    if (step.action === action) {
+      this.waitingForAction = false;
+      const nextBtn = tutorialTooltip.querySelector(".tutorial-next-btn");
+      nextBtn.disabled = false;
+      nextBtn.textContent = this.current === this.steps.length - 1 ? "完成" : "下一步";
+      
+      if (action === "snap") {
+        setTimeout(() => this.next(), 800);
+      }
+    }
+  },
+
+  showStep() {
+    const step = this.steps[this.current];
+    const indicator = tutorialTooltip.querySelector(".tutorial-step-indicator");
+    const text = tutorialTooltip.querySelector(".tutorial-text");
+    const nextBtn = tutorialTooltip.querySelector(".tutorial-next-btn");
+
+    indicator.textContent = `${this.current + 1} / ${this.steps.length}`;
+    text.textContent = step.text;
+    
+    this.waitingForAction = step.action !== null && step.action !== "snap";
+    nextBtn.disabled = this.waitingForAction;
+    nextBtn.textContent = this.waitingForAction ? "请先完成操作" : (this.current === this.steps.length - 1 ? "完成" : "下一步");
+
+    tutorialTooltip.className = "tutorial-tooltip";
+
+    if (step.target) {
+      const el = document.querySelector(step.target);
+      if (el && !el.closest(".hidden")) {
+        const rect = el.getBoundingClientRect();
+        const pad = 10;
+        tutorialSpotlight.style.left = `${rect.left - pad}px`;
+        tutorialSpotlight.style.top = `${rect.top - pad}px`;
+        tutorialSpotlight.style.width = `${rect.width + pad * 2}px`;
+        tutorialSpotlight.style.height = `${rect.height + pad * 2}px`;
+        tutorialSpotlight.style.display = "";
+
+        this.positionTooltip(rect, step.arrow);
+      } else {
+        tutorialSpotlight.style.display = "none";
+        this.centerTooltip();
+      }
+    } else {
+      tutorialSpotlight.style.display = "none";
+      this.centerTooltip();
+    }
+  },
+
+  centerTooltip() {
+    tutorialTooltip.style.left = `${(window.innerWidth - 320) / 2}px`;
+    tutorialTooltip.style.top = `${window.innerHeight / 2 - 80}px`;
+  },
+
+  positionTooltip(targetRect, arrowSide) {
+    const tw = 320;
+    const gap = 20;
+    let left, top;
+
+    if (arrowSide === "bottom") {
+      left = targetRect.left + targetRect.width / 2 - tw / 2;
+      top = targetRect.bottom + gap + 10;
+      tutorialTooltip.classList.add("arrow-top");
+    } else if (arrowSide === "top") {
+      left = targetRect.left + targetRect.width / 2 - tw / 2;
+      top = targetRect.top - gap - 140;
+      tutorialTooltip.classList.add("arrow-bottom");
+    } else if (arrowSide === "left") {
+      left = targetRect.left - tw - gap;
+      top = targetRect.top + targetRect.height / 2 - 70;
+      tutorialTooltip.classList.add("arrow-right");
+    } else if (arrowSide === "right") {
+      left = targetRect.right + gap;
+      top = targetRect.top + targetRect.height / 2 - 70;
+      tutorialTooltip.classList.add("arrow-left");
+    }
+
+    left = Math.max(12, Math.min(left, window.innerWidth - tw - 12));
+    top = Math.max(12, Math.min(top, window.innerHeight - 160));
+
+    tutorialTooltip.style.left = `${left}px`;
+    tutorialTooltip.style.top = `${top}px`;
+  }
+};
+
 function init() {
   document.querySelectorAll(".level-card").forEach((card) => {
     card.addEventListener("click", () => selectLevel(card.dataset.level));
@@ -318,6 +527,20 @@ function init() {
   clearArchiveBtn.addEventListener("click", openConfirmModal);
   cancelClearBtn.addEventListener("click", closeConfirmModal);
   confirmClearBtn.addEventListener("click", clearArchive);
+
+  tutorialBtn.addEventListener("click", () => {
+    if (tutorial.active) {
+      tutorial.skip();
+    } else {
+      tutorial.start();
+    }
+  });
+  tutorialTooltip.querySelector(".tutorial-next-btn").addEventListener("click", () => {
+    tutorial.next();
+  });
+  tutorialTooltip.querySelector(".tutorial-skip-btn").addEventListener("click", () => {
+    tutorial.skip();
+  });
 
   document.querySelectorAll(".tab-btn").forEach((btn) => {
     btn.addEventListener("click", () => {
@@ -344,7 +567,7 @@ function init() {
   backBtn.classList.add("hidden");
 }
 
-function selectLevel(levelId) {
+function selectLevel(levelId, skipAutoTutorial = false) {
   currentLevel = levelId;
   const level = levels[levelId];
   levelNameEl.textContent = level.name;
@@ -357,10 +580,15 @@ function selectLevel(levelId) {
   resultEl.classList.add("hidden");
   resetStatsDisplay(levelId);
   render();
+
+  if (!skipAutoTutorial && !tutorial.isDone() && !tutorial.active) {
+    setTimeout(() => tutorial.start(), 400);
+  }
 }
 
 function goBack() {
   clearInterval(timer);
+  if (tutorial.active) tutorial.skip();
   currentLevel = null;
   levelSelectEl.classList.remove("hidden");
   gameAreaEl.classList.add("hidden");
@@ -384,6 +612,7 @@ function start() {
     renderStats();
   }, 1000);
   render();
+  tutorial.notifyAction("start");
 }
 
 function reset() {
@@ -409,6 +638,7 @@ function dig(index) {
     addLog("这一格只有松土和碎砂。");
   }
   render();
+  tutorial.notifyAction("dig");
 }
 
 function spawnPiece(id) {
@@ -452,6 +682,7 @@ function endDrag(event) {
   const piece = event.currentTarget;
   piece.removeEventListener("pointermove", dragMove);
   dragging = null;
+  tutorial.notifyAction("drag");
   trySnap(piece);
 }
 
@@ -459,6 +690,7 @@ function rotatePiece(piece) {
   if (!state.running || piece.classList.contains("locked")) return;
   piece.dataset.angle = String((Number(piece.dataset.angle) + 45) % 360);
   applyRotation(piece);
+  tutorial.notifyAction("rotate");
 }
 
 function applyRotation(piece) {
@@ -486,6 +718,7 @@ function trySnap(piece) {
     piece.classList.add("locked");
     state.locked.add(id);
     addLog(`${def.label}${level.pieceName}贴合成功。`);
+    tutorial.notifyAction("snap");
     if (state.locked.size === level.pieceDefs.length) {
       finish(true, `${level.name}修复完成。`);
     }
