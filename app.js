@@ -29,6 +29,168 @@ const tutorialTooltip = document.getElementById("tutorialTooltip");
 const ARCHIVE_STORAGE_KEY = "archaeology_archive_records";
 const TUTORIAL_STORAGE_KEY = "archaeology_tutorial_done";
 
+const SITE_EVENTS = {
+  collapse: {
+    id: "collapse",
+    name: "塌方",
+    type: "negative",
+    probability: 0.12,
+    cooldown: 2,
+    description: "探方侧壁发生塌方",
+    key: true,
+    apply(state, level) {
+      const cellCount = 25;
+      const pieceIndices = Object.keys(level.buried).map(Number);
+      const lockable = [];
+      for (let i = 0; i < cellCount; i++) {
+        if (!state.dug.has(i) && !state.lockedCells.has(i) && !pieceIndices.includes(i)) {
+          lockable.push(i);
+        }
+      }
+      const foundPieceIndices = [];
+      for (const pi of pieceIndices) {
+        if (!state.dug.has(pi) && !state.lockedCells.has(pi)) {
+          foundPieceIndices.push(pi);
+        }
+      }
+      const availablePieceCount = foundPieceIndices.length;
+      const remainingPieces = pieceIndices.filter(
+        (pi) => !state.dug.has(pi) && !state.found.has(level.buried[pi])
+      ).length;
+      let lockCount = Math.min(2, lockable.length);
+      if (lockable.length > 0 && remainingPieces > 2) {
+        const actualLock = [];
+        for (let i = 0; i < lockCount; i++) {
+          if (lockable.length === 0) break;
+          const idx = Math.floor(Math.random() * lockable.length);
+          actualLock.push(lockable.splice(idx, 1)[0]);
+        }
+        actualLock.forEach((i) => state.lockedCells.add(i));
+        return {
+          success: true,
+          message: `塌方！${actualLock.length} 格探方被土方掩埋，暂时无法挖掘。`
+        };
+      }
+      return { success: false };
+    }
+  },
+  rain: {
+    id: "rain",
+    name: "雨水",
+    type: "negative",
+    probability: 0.1,
+    cooldown: 3,
+    description: "突降雨水，作业暂停",
+    key: true,
+    apply(state, level) {
+      const minTimeLeft = 15;
+      const penalty = Math.min(10, state.timeLeft - minTimeLeft);
+      if (penalty > 0) {
+        state.timeLeft -= penalty;
+        return {
+          success: true,
+          message: `突降暴雨！现场排水耗费 ${penalty} 秒时间。`
+        };
+      }
+      return { success: false };
+    }
+  },
+  markerLayer: {
+    id: "markerLayer",
+    name: "发现标记层",
+    type: "positive",
+    probability: 0.08,
+    cooldown: 4,
+    description: "发现文化层标记",
+    key: true,
+    apply(state, level) {
+      const pieceIndices = Object.keys(level.buried).map(Number);
+      const hiddenPieces = pieceIndices.filter(
+        (i) => !state.dug.has(i) && !state.hintedCells.has(i)
+      );
+      if (hiddenPieces.length > 0) {
+        const targetIdx = hiddenPieces[Math.floor(Math.random() * hiddenPieces.length)];
+        state.hintedCells.add(targetIdx);
+        const def = level.pieceDefs.find((p) => p.id === level.buried[targetIdx]);
+        return {
+          success: true,
+          message: `发现文化层标记！${def ? def.label : "某件"}${level.pieceName}附近有标识。`
+        };
+      }
+      return { success: false };
+    }
+  },
+  toolWear: {
+    id: "toolWear",
+    name: "工具磨损",
+    type: "negative",
+    probability: 0.15,
+    cooldown: 1,
+    description: "发掘工具磨损",
+    key: false,
+    apply(state, level) {
+      state.toolWear += 1;
+      return {
+        success: true,
+        message: `手铲刃口磨损，本轮评分将受影响。`,
+        silent: state.toolWear > 1
+      };
+    }
+  },
+  goodWeather: {
+    id: "goodWeather",
+    name: "好天气",
+    type: "positive",
+    probability: 0.08,
+    cooldown: 5,
+    description: "天气晴朗，光线充足",
+    key: true,
+    apply(state, level) {
+      if (state.timeLeft < level.timeLimit) {
+        const bonus = 8;
+        state.timeLeft += bonus;
+        return {
+          success: true,
+          message: `天气晴好！多出 ${bonus} 秒作业时间。`
+        };
+      }
+      return { success: false };
+    }
+  },
+  ancientTrack: {
+    id: "ancientTrack",
+    name: "古人痕迹",
+    type: "positive",
+    probability: 0.06,
+    cooldown: 3,
+    description: "发现古人活动痕迹",
+    key: true,
+    apply(state, level) {
+      state.bonusScore += 5;
+      return {
+        success: true,
+        message: `发现古人活动痕迹！额外加 5 分。`
+      };
+    }
+  },
+  strayFind: {
+    id: "strayFind",
+    name: "零散遗物",
+    type: "positive",
+    probability: 0.07,
+    cooldown: 2,
+    description: "发现零散遗物",
+    key: false,
+    apply(state, level) {
+      state.bonusScore += 2;
+      return {
+        success: true,
+        message: `发现零散遗物！额外加 2 分。`
+      };
+    }
+  }
+};
+
 const levels = {
   bowl: {
     name: "陶碗",
@@ -150,13 +312,20 @@ const archive = {
         bestByLevel[record.levelId] = record;
       } else {
         const existing = bestByLevel[record.levelId];
-        if (record.completeness > existing.completeness) {
+        const recordScore = record.finalScore !== undefined ? record.finalScore : record.completeness;
+        const existingScore = existing.finalScore !== undefined ? existing.finalScore : existing.completeness;
+
+        if (recordScore > existingScore) {
           bestByLevel[record.levelId] = record;
-        } else if (record.completeness === existing.completeness) {
-          if (record.timeUsed < existing.timeUsed) {
+        } else if (recordScore === existingScore) {
+          if (record.completeness > existing.completeness) {
             bestByLevel[record.levelId] = record;
-          } else if (record.timeUsed === existing.timeUsed && record.digs < existing.digs) {
-            bestByLevel[record.levelId] = record;
+          } else if (record.completeness === existing.completeness) {
+            if (record.timeUsed < existing.timeUsed) {
+              bestByLevel[record.levelId] = record;
+            } else if (record.timeUsed === existing.timeUsed && record.digs < existing.digs) {
+              bestByLevel[record.levelId] = record;
+            }
           }
         }
       }
@@ -223,8 +392,23 @@ function createRecordCard(record, showBadge = false) {
   stats.appendChild(digStat);
   stats.appendChild(completenessStat);
 
+  if (record.finalScore !== undefined) {
+    const scoreStat = document.createElement("div");
+    scoreStat.className = "record-stat";
+    scoreStat.innerHTML = `<div class="record-stat-label">评分</div><div class="record-stat-value">${record.finalScore}</div>`;
+    stats.appendChild(scoreStat);
+  }
+
   card.appendChild(header);
   card.appendChild(stats);
+
+  if (record.keyEvents && record.keyEvents.length > 0) {
+    const eventsDiv = document.createElement("div");
+    eventsDiv.className = "record-events";
+    const eventList = record.keyEvents.map((e) => e.name).join(" · ");
+    eventsDiv.innerHTML = `<span class="record-events-label">关键事件：</span>${eventList}`;
+    card.appendChild(eventsDiv);
+  }
 
   return card;
 }
@@ -297,7 +481,14 @@ function freshState() {
     dug: new Set(),
     found: new Set(),
     locked: new Set(),
-    log: [`探方已经布好，先从泥土里找${level.pieceName}。`]
+    log: [`探方已经布好，先从泥土里找${level.pieceName}。`],
+    lockedCells: new Set(),
+    hintedCells: new Set(),
+    toolWear: 0,
+    bonusScore: 0,
+    triggeredEvents: [],
+    keyEvents: [],
+    eventCooldowns: {}
   };
 }
 
@@ -309,6 +500,77 @@ function resetStatsDisplay(levelId) {
   }
   digCountEl.textContent = "0";
   progressEl.textContent = "0%";
+}
+
+function tryTriggerEvent() {
+  const level = levels[currentLevel];
+  const events = Object.values(SITE_EVENTS);
+  const availableEvents = events.filter((evt) => {
+    const cooldown = state.eventCooldowns[evt.id] || 0;
+    return cooldown <= 0;
+  });
+
+  for (const evt of availableEvents) {
+    if (Math.random() < evt.probability) {
+      const result = evt.apply(state, level);
+      if (result.success) {
+        state.triggeredEvents.push({
+          id: evt.id,
+          name: evt.name,
+          type: evt.type,
+          message: result.message,
+          timestamp: Date.now()
+        });
+
+        if (evt.key) {
+          state.keyEvents.push({
+            id: evt.id,
+            name: evt.name,
+            type: evt.type,
+            message: result.message
+          });
+        }
+
+        if (!result.silent) {
+          addLog(result.message);
+        }
+
+        state.eventCooldowns[evt.id] = evt.cooldown;
+
+        Object.keys(state.eventCooldowns).forEach((id) => {
+          if (id !== evt.id && state.eventCooldowns[id] > 0) {
+            state.eventCooldowns[id] -= 1;
+          }
+        });
+
+        return evt;
+      }
+    }
+  }
+
+  Object.keys(state.eventCooldowns).forEach((id) => {
+    if (state.eventCooldowns[id] > 0) {
+      state.eventCooldowns[id] -= 1;
+    }
+  });
+
+  return null;
+}
+
+function calculateFinalScore(level) {
+  const baseScore = Math.round((state.locked.size / level.pieceDefs.length) * 100);
+  const timeBonus = Math.max(0, state.timeLeft);
+  const digPenalty = Math.max(0, state.digs - level.pieceDefs.length) * 2;
+  const wearPenalty = state.toolWear * 3;
+  const finalScore = Math.max(0, baseScore + state.bonusScore + Math.floor(timeBonus / 5) - digPenalty - wearPenalty);
+  return {
+    baseScore,
+    bonusScore: state.bonusScore,
+    timeBonus: Math.floor(timeBonus / 5),
+    digPenalty,
+    wearPenalty,
+    finalScore
+  };
 }
 
 const tutorial = {
@@ -625,7 +887,7 @@ function reset() {
 }
 
 function dig(index) {
-  if (!state.running || state.dug.has(index)) return;
+  if (!state.running || state.dug.has(index) || state.lockedCells.has(index)) return;
   const level = levels[currentLevel];
   state.dug.add(index);
   state.digs += 1;
@@ -638,6 +900,7 @@ function dig(index) {
   } else {
     addLog("这一格只有松土和碎砂。");
   }
+  tryTriggerEvent();
   render();
 }
 
@@ -734,7 +997,37 @@ function finish(success, message) {
   clearInterval(timer);
   const level = levels[currentLevel];
   const completeness = Math.round((state.locked.size / level.pieceDefs.length) * 100);
-  resultEl.innerHTML = `<h2>${message}</h2><p>${success ? "通关" : "结束"}：${level.name}修复任务 · 用时${level.timeLimit - state.timeLeft}秒 · 挖掘${state.digs}次 · 完整度${completeness}%。</p>`;
+  const scores = calculateFinalScore(level);
+
+  let eventsHtml = "";
+  if (state.keyEvents.length > 0) {
+    eventsHtml = `<div class="result-events">
+      <h3>本轮关键事件</h3>
+      <ul>`;
+    state.keyEvents.forEach((evt) => {
+      const typeClass = evt.type === "positive" ? "event-positive" : "event-negative";
+      const icon = evt.type === "positive" ? "✦" : "⚡";
+      eventsHtml += `<li class="${typeClass}"><span class="event-icon">${icon}</span>${evt.message}</li>`;
+    });
+    eventsHtml += `</ul></div>`;
+  }
+
+  const scoreBreakdown = `
+    <div class="result-scores">
+      <h3>评分明细</h3>
+      <div class="score-item"><span>完整度</span><span>+${scores.baseScore}</span></div>
+      ${scores.bonusScore > 0 ? `<div class="score-item"><span>遗物奖励</span><span>+${scores.bonusScore}</span></div>` : ""}
+      ${scores.timeBonus > 0 ? `<div class="score-item"><span>时间奖励</span><span>+${scores.timeBonus}</span></div>` : ""}
+      ${scores.digPenalty > 0 ? `<div class="score-item penalty"><span>多余挖掘</span><span>-${scores.digPenalty}</span></div>` : ""}
+      ${scores.wearPenalty > 0 ? `<div class="score-item penalty"><span>工具磨损</span><span>-${scores.wearPenalty}</span></div>` : ""}
+      <div class="score-item total"><span>最终评分</span><span>${scores.finalScore}</span></div>
+    </div>
+  `;
+
+  resultEl.innerHTML = `<h2>${message}</h2>
+    <p>${success ? "通关" : "结束"}：${level.name}修复任务 · 用时${level.timeLimit - state.timeLeft}秒 · 挖掘${state.digs}次 · 完整度${completeness}%。</p>
+    ${eventsHtml}
+    ${scoreBreakdown}`;
   resultEl.classList.remove("hidden");
 
   if (success) {
@@ -744,6 +1037,11 @@ function finish(success, message) {
       timeUsed: level.timeLimit - state.timeLeft,
       digs: state.digs,
       completeness: completeness,
+      finalScore: scores.finalScore,
+      scores: scores,
+      keyEvents: state.keyEvents,
+      toolWear: state.toolWear,
+      bonusScore: state.bonusScore,
       completedAt: Date.now()
     };
     archive.addRecord(record);
@@ -781,8 +1079,18 @@ function renderGrid() {
     cell.className = "cell";
     if (state.dug.has(i)) cell.classList.add("dug");
     if (state.found.has(level.buried[i])) cell.classList.add("found");
-    cell.textContent = state.dug.has(i) ? (level.buried[i] ? level.pieceName : "土") : "";
-    cell.disabled = !state.running || state.dug.has(i);
+    if (state.lockedCells.has(i)) cell.classList.add("locked-cell");
+    if (state.hintedCells.has(i) && !state.dug.has(i)) cell.classList.add("hinted");
+    if (state.dug.has(i)) {
+      cell.textContent = level.buried[i] ? level.pieceName : "土";
+    } else if (state.lockedCells.has(i)) {
+      cell.textContent = "⚠";
+    } else if (state.hintedCells.has(i)) {
+      cell.textContent = "?";
+    } else {
+      cell.textContent = "";
+    }
+    cell.disabled = !state.running || state.dug.has(i) || state.lockedCells.has(i);
     cell.addEventListener("click", () => dig(i));
     gridEl.appendChild(cell);
   }
