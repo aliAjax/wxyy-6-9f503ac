@@ -34,6 +34,27 @@ const compassIndicator = document.getElementById("compassIndicator");
 const compassArrow = compassIndicator.querySelector(".compass-arrow");
 const compassDistance = compassIndicator.querySelector(".compass-distance");
 
+const focusBtn = document.getElementById("focusBtn");
+const labSection = document.querySelector(".lab");
+const digSiteSection = document.querySelector(".dig-site");
+const notesSection = document.querySelector(".notes");
+const mobileTabs = document.querySelector(".mobile-tabs");
+
+let isMobile = window.innerWidth <= 768;
+let currentMobileTab = "dig";
+let selectedPiece = null;
+let lastTapTime = 0;
+let doubleTapDelay = 300;
+let touchDragOffsetY = 60;
+let pieceInitialPositions = new Map();
+
+let gestureState = {
+  active: false,
+  initialDistance: 0,
+  initialAngle: 0,
+  pieceAngle: 0
+};
+
 const ARCHIVE_STORAGE_KEY = "archaeology_archive_records";
 const TUTORIAL_STORAGE_KEY = "archaeology_tutorial_done";
 const RATING_ORDER = { S: 5, A: 4, B: 3, C: 2, D: 1, F: 0 };
@@ -1245,6 +1266,38 @@ function init() {
     if (e.target === confirmModal) closeConfirmModal();
   });
 
+  document.querySelectorAll(".mobile-tab-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      switchMobileTab(btn.dataset.tab);
+    });
+  });
+
+  focusBtn.addEventListener("click", toggleFocusMode);
+
+  document.addEventListener("click", (e) => {
+    if (!e.target.closest(".piece") && !e.target.closest(".piece-rotate-handle")) {
+      deselectPiece();
+    }
+  });
+
+  document.addEventListener("touchstart", (e) => {
+    if (!e.target.closest(".piece") && !e.target.closest(".piece-rotate-handle")) {
+      deselectPiece();
+    }
+  }, { passive: true });
+
+  let resizeTimeout;
+  window.addEventListener("resize", () => {
+    clearTimeout(resizeTimeout);
+    resizeTimeout = setTimeout(() => {
+      updateIsMobile();
+    }, 150);
+  });
+
+  window.addEventListener("orientationchange", handleOrientationChange);
+
+  updateIsMobile();
+
   resetStatsDisplay();
   levelSelectEl.classList.remove("hidden");
   gameAreaEl.classList.add("hidden");
@@ -1484,8 +1537,21 @@ function spawnPiece(id) {
   piece.style.borderStyle = "solid";
   piece.style.borderRadius = style.borderRadius;
   piece.style.setProperty("--piece-locked-bg", style.lockedBackground);
-  piece.style.left = `${22 + state.found.size * 16}px`;
-  piece.style.top = `${26 + state.found.size * 48}px`;
+
+  const piecesRect = piecesEl.getBoundingClientRect();
+  const foundCount = state.found.size - 1;
+
+  if (isMobile) {
+    const pieceSize = window.innerWidth <= 480 ? 60 : 70;
+    const cols = 3;
+    const col = foundCount % cols;
+    const row = Math.floor(foundCount / cols);
+    piece.style.left = `${10 + col * (pieceSize + 12)}px`;
+    piece.style.top = `${10 + row * (pieceSize + 12)}px`;
+  } else {
+    piece.style.left = `${22 + foundCount * 16}px`;
+    piece.style.top = `${26 + foundCount * 48}px`;
+  }
 
   const innerDeco = document.createElement("div");
   innerDeco.className = "piece-inner-deco";
@@ -1497,6 +1563,20 @@ function spawnPiece(id) {
   innerDeco.style.zIndex = "0";
   piece.insertBefore(innerDeco, piece.firstChild);
 
+  const rotateHandle = document.createElement("div");
+  rotateHandle.className = "piece-rotate-handle";
+  rotateHandle.textContent = "↻";
+  rotateHandle.addEventListener("pointerdown", (e) => {
+    e.stopPropagation();
+    rotatePiece(piece);
+  });
+  rotateHandle.addEventListener("touchstart", (e) => {
+    e.stopPropagation();
+    e.preventDefault();
+    rotatePiece(piece);
+  }, { passive: false });
+  piece.appendChild(rotateHandle);
+
   const labelSpan = document.createElement("span");
   labelSpan.className = "piece-label";
   labelSpan.textContent = def.label;
@@ -1506,38 +1586,107 @@ function spawnPiece(id) {
 
   applyRotation(piece);
   piece.addEventListener("pointerdown", startDrag);
+  piece.addEventListener("touchstart", handleTouchStart, { passive: false });
   piece.addEventListener("dblclick", () => rotatePiece(piece));
   piecesEl.appendChild(piece);
+  pieceInitialPositions.set(id, {
+    left: piece.style.left,
+    top: piece.style.top
+  });
+
+  if (isMobile && state.found.size === 1) {
+    pulseMobileTab("repair");
+  }
+}
+
+function pulseMobileTab(tabName) {
+  const btn = document.querySelector(`.mobile-tab-btn[data-tab="${tabName}"]`);
+  if (!btn) return;
+  btn.style.animation = "none";
+  btn.offsetHeight;
+  btn.style.animation = "tabPulse 1.5s ease-in-out 3";
+  setTimeout(() => {
+    btn.style.animation = "";
+  }, 4500);
 }
 
 function startDrag(event) {
   const piece = event.currentTarget;
   if (piece.classList.contains("locked")) return;
   piece.setPointerCapture(event.pointerId);
+  selectPiece(piece);
+
+  const isTouch = event.pointerType === "touch";
+  const rect = piecesEl.getBoundingClientRect();
+  const pieceWidth = piece.offsetWidth;
+  const pieceHeight = piece.offsetHeight;
+
+  let offsetX, offsetY;
+  if (isTouch) {
+    offsetX = pieceWidth / 2;
+    offsetY = pieceHeight / 2 + touchDragOffsetY;
+  } else {
+    offsetX = event.clientX - piece.offsetLeft;
+    offsetY = event.clientY - piece.offsetTop;
+  }
+
   dragging = {
     piece,
-    offsetX: event.clientX - piece.offsetLeft,
-    offsetY: event.clientY - piece.offsetTop
+    offsetX,
+    offsetY,
+    isTouch
   };
+
+  piece.classList.add("dragging");
   piece.addEventListener("pointermove", dragMove);
   piece.addEventListener("pointerup", endDrag, { once: true });
+  piece.addEventListener("pointercancel", endDrag, { once: true });
+  preventPageScroll(true);
 }
 
 function dragMove(event) {
   if (!dragging) return;
   const rect = piecesEl.getBoundingClientRect();
-  dragging.piece.style.left = `${event.clientX - rect.left - 50}px`;
-  dragging.piece.style.top = `${event.clientY - rect.top - 50}px`;
-  updateCompass(dragging.piece, event.clientX, event.clientY);
+  const piece = dragging.piece;
+  const pieceWidth = piece.offsetWidth;
+  const pieceHeight = piece.offsetHeight;
+
+  let newLeft = event.clientX - rect.left - dragging.offsetX;
+  let newTop = event.clientY - rect.top - dragging.offsetY;
+
+  const maxLeft = rect.width - pieceWidth;
+  const maxTop = rect.height - pieceHeight;
+  newLeft = Math.max(0, Math.min(newLeft, maxLeft));
+  newTop = Math.max(0, Math.min(newTop, maxTop));
+
+  piece.style.left = `${newLeft}px`;
+  piece.style.top = `${newTop}px`;
+
+  updateSnapFeedback(piece);
+  updateCompass(piece, event.clientX, event.clientY);
 }
 
 function endDrag(event) {
   const piece = event.currentTarget;
   piece.removeEventListener("pointermove", dragMove);
+  piece.removeEventListener("pointercancel", endDrag);
+  piece.classList.remove("dragging");
   dragging = null;
   hideCompass();
+  clearSnapFeedback();
+  preventPageScroll(false);
   tutorial.notifyAction("drag");
   trySnap(piece);
+}
+
+function preventPageScroll(prevent) {
+  if (prevent) {
+    document.body.style.overflow = "hidden";
+    document.body.style.touchAction = "none";
+  } else {
+    document.body.style.overflow = "";
+    document.body.style.touchAction = "";
+  }
 }
 
 function rotatePiece(piece) {
@@ -1545,6 +1694,215 @@ function rotatePiece(piece) {
   piece.dataset.angle = String((Number(piece.dataset.angle) + 45) % 360);
   applyRotation(piece);
   tutorial.notifyAction("rotate");
+  if (dragging && dragging.piece === piece) {
+    updateSnapFeedback(piece);
+  }
+}
+
+function selectPiece(piece) {
+  if (selectedPiece && selectedPiece !== piece) {
+    selectedPiece.classList.remove("selected");
+  }
+  selectedPiece = piece;
+  piece.classList.add("selected");
+}
+
+function deselectPiece() {
+  if (selectedPiece) {
+    selectedPiece.classList.remove("selected");
+    selectedPiece = null;
+  }
+}
+
+function updateSnapFeedback(piece) {
+  const template = artifactTemplates[currentTemplate];
+  const id = piece.dataset.id;
+  const def = template.pieceDefs.find((item) => item.id === id);
+  if (!def) return;
+
+  const pieceRect = piece.getBoundingClientRect();
+  const targetRect = targetEl.getBoundingClientRect();
+  const centerX = pieceRect.left + pieceRect.width / 2;
+  const centerY = pieceRect.top + pieceRect.height / 2;
+  const targetX = targetRect.left + targetRect.width * (def.slot.x + 18) / 100;
+  const targetY = targetRect.top + targetRect.height * (def.slot.y + 18) / 100;
+  const distance = Math.hypot(centerX - targetX, centerY - targetY);
+  const snapRadius = template.snapRadius;
+
+  const slot = targetEl.querySelector(`.slot[data-piece-id="${id}"]`);
+
+  if (distance < snapRadius * 1.5) {
+    piece.classList.add("near-slot");
+    if (slot) slot.classList.add("highlight");
+  } else {
+    piece.classList.remove("near-slot");
+    if (slot) slot.classList.remove("highlight");
+  }
+}
+
+function clearSnapFeedback() {
+  document.querySelectorAll(".piece.near-slot").forEach((p) => {
+    p.classList.remove("near-slot");
+  });
+  document.querySelectorAll(".slot.highlight").forEach((s) => {
+    s.classList.remove("highlight");
+  });
+}
+
+function handleTouchStart(event) {
+  const piece = event.currentTarget;
+  if (piece.classList.contains("locked")) return;
+
+  if (event.touches.length === 1) {
+    const now = Date.now();
+    if (now - lastTapTime < doubleTapDelay) {
+      event.preventDefault();
+      rotatePiece(piece);
+      lastTapTime = 0;
+      return;
+    }
+    lastTapTime = now;
+  }
+
+  if (event.touches.length === 2) {
+    event.preventDefault();
+    startTwoFingerRotate(event, piece);
+  }
+}
+
+function startTwoFingerRotate(event, piece) {
+  if (piece.classList.contains("locked")) return;
+
+  const touch1 = event.touches[0];
+  const touch2 = event.touches[1];
+
+  const dx = touch2.clientX - touch1.clientX;
+  const dy = touch2.clientY - touch1.clientY;
+  gestureState.initialDistance = Math.hypot(dx, dy);
+  gestureState.initialAngle = Math.atan2(dy, dx) * 180 / Math.PI;
+  gestureState.pieceAngle = Number(piece.dataset.angle) || 0;
+  gestureState.active = true;
+  gestureState.piece = piece;
+
+  document.addEventListener("touchmove", handleTwoFingerMove, { passive: false });
+  document.addEventListener("touchend", handleTwoFingerEnd, { once: true });
+  selectPiece(piece);
+  preventPageScroll(true);
+}
+
+function handleTwoFingerMove(event) {
+  if (!gestureState.active || !gestureState.piece) return;
+  if (event.touches.length < 2) return;
+
+  event.preventDefault();
+
+  const touch1 = event.touches[0];
+  const touch2 = event.touches[1];
+
+  const dx = touch2.clientX - touch1.clientX;
+  const dy = touch2.clientY - touch1.clientY;
+  const currentAngle = Math.atan2(dy, dx) * 180 / Math.PI;
+
+  let angleDiff = currentAngle - gestureState.initialAngle;
+  let newAngle = gestureState.pieceAngle + angleDiff;
+
+  newAngle = ((newAngle % 360) + 360) % 360;
+
+  const piece = gestureState.piece;
+  piece.dataset.angle = String(Math.round(newAngle / 45) * 45);
+  applyRotation(piece);
+}
+
+function handleTwoFingerEnd() {
+  if (gestureState.active && gestureState.piece) {
+    updateSnapFeedback(gestureState.piece);
+  }
+  gestureState.active = false;
+  gestureState.piece = null;
+  document.removeEventListener("touchmove", handleTwoFingerMove);
+  preventPageScroll(false);
+}
+
+function switchMobileTab(tabName) {
+  currentMobileTab = tabName;
+
+  document.querySelectorAll(".mobile-tab-btn").forEach((btn) => {
+    btn.classList.toggle("active", btn.dataset.tab === tabName);
+  });
+
+  digSiteSection.classList.toggle("mobile-hidden", tabName !== "dig");
+  labSection.classList.toggle("mobile-hidden", tabName !== "repair");
+  notesSection.classList.toggle("mobile-hidden", tabName !== "notes");
+}
+
+function toggleFocusMode() {
+  labSection.classList.toggle("focus-mode");
+  focusBtn.classList.toggle("active");
+  focusBtn.textContent = labSection.classList.contains("focus-mode") ? "✕ 退出" : "⛶ 全屏";
+}
+
+function updateIsMobile() {
+  const wasMobile = isMobile;
+  isMobile = window.innerWidth <= 768;
+
+  if (wasMobile !== isMobile) {
+    if (isMobile) {
+      switchMobileTab(currentMobileTab);
+    } else {
+      digSiteSection.classList.remove("mobile-hidden");
+      labSection.classList.remove("mobile-hidden");
+      notesSection.classList.remove("mobile-hidden");
+      labSection.classList.remove("focus-mode");
+      focusBtn.classList.remove("active");
+      focusBtn.textContent = "⛶ 全屏";
+    }
+  }
+
+  if (isMobile) {
+    repositionPiecesForMobile();
+  }
+}
+
+function repositionPiecesForMobile() {
+  const pieces = document.querySelectorAll(".piece:not(.locked)");
+  const rect = piecesEl.getBoundingClientRect();
+
+  pieces.forEach((piece, index) => {
+    const id = piece.dataset.id;
+    if (pieceInitialPositions.has(id)) {
+      const pieceWidth = piece.offsetWidth || 70;
+      const pieceHeight = piece.offsetHeight || 70;
+      const col = index % 3;
+      const row = Math.floor(index / 3);
+      piece.style.left = `${10 + col * (pieceWidth + 12)}px`;
+      piece.style.top = `${10 + row * (pieceHeight + 12)}px`;
+    }
+  });
+}
+
+function handleOrientationChange() {
+  setTimeout(() => {
+    updateIsMobile();
+    clearSnapFeedback();
+
+    if (selectedPiece && !selectedPiece.classList.contains("locked")) {
+      const rect = piecesEl.getBoundingClientRect();
+      const pieceRect = selectedPiece.getBoundingClientRect();
+      const pieceWidth = selectedPiece.offsetWidth;
+      const pieceHeight = selectedPiece.offsetHeight;
+
+      let left = parseFloat(selectedPiece.style.left);
+      let top = parseFloat(selectedPiece.style.top);
+
+      const maxLeft = rect.width - pieceWidth;
+      const maxTop = rect.height - pieceHeight;
+      left = Math.max(0, Math.min(left, maxLeft));
+      top = Math.max(0, Math.min(top, maxTop));
+
+      selectedPiece.style.left = `${left}px`;
+      selectedPiece.style.top = `${top}px`;
+    }
+  }, 100);
 }
 
 function applyRotation(piece) {
@@ -1568,22 +1926,33 @@ function trySnap(piece) {
     const benchRect = piecesEl.getBoundingClientRect();
     const targetRelativeX = targetRect.left - benchRect.left + targetRect.width * def.slot.x / 100;
     const targetRelativeY = targetRect.top - benchRect.top + targetRect.height * def.slot.y / 100;
+
+    piece.classList.add("snapping");
     piece.style.left = `${targetRelativeX}px`;
     piece.style.top = `${targetRelativeY}px`;
-    piece.classList.add("locked");
-    piece.style.background = template.piece.style.lockedBackground;
-    state.locked.add(id);
-    addLog(`${def.label}${template.pieceName}贴合成功。`);
-    tutorial.notifyAction("snap");
-    if (state.locked.size === template.pieceDefs.length) {
-      finish(true, `${template.name}修复完成。`);
-    }
+
+    setTimeout(() => {
+      piece.classList.remove("snapping");
+      piece.classList.add("locked");
+      piece.classList.remove("selected");
+      piece.style.background = template.piece.style.lockedBackground;
+      state.locked.add(id);
+      addLog(`${def.label}${template.pieceName}贴合成功。`);
+      tutorial.notifyAction("snap");
+      if (selectedPiece === piece) {
+        selectedPiece = null;
+      }
+      if (state.locked.size === template.pieceDefs.length) {
+        finish(true, `${template.name}修复完成。`);
+      }
+    }, 150);
   } else if (distance < snapRadius && !angleOk) {
     state.wrongAngleAttempts += 1;
     addLog("角度不对，双击碎片可以旋转。");
   } else if (!angleOk) {
     addLog("角度不对，双击碎片可以旋转。");
   }
+  clearSnapFeedback();
   renderStats();
 }
 

@@ -31,6 +31,11 @@
     </section>
 
     <section id="gameArea" class="layout hidden">
+      <div class="mobile-tabs">
+        <button class="mobile-tab-btn active" data-tab="dig">⛏️ 探方</button>
+        <button class="mobile-tab-btn" data-tab="repair">🔧 修复</button>
+        <button class="mobile-tab-btn" data-tab="notes">📝 记录</button>
+      </div>
       <section class="dig-site">
         <div class="section-title">
           <h2>探方 · <span id="levelName">陶碗</span></h2>
@@ -59,7 +64,10 @@
       <section class="lab">
         <div class="section-title">
           <h2>修复台</h2>
-          <button id="restartBtn" type="button">重来</button>
+          <div class="section-actions">
+            <button id="focusBtn" type="button" class="lab-focus-btn">⛶ 全屏</button>
+            <button id="restartBtn" type="button">重来</button>
+          </div>
         </div>
         <div class="workbench">
           <div id="target" class="target">
