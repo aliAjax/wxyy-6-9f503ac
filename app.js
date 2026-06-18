@@ -236,10 +236,10 @@ const artifactTemplates = {
       21: "p4"
     },
     pieceDefs: [
-      { id: "p1", label: "上左", slot: { x: 10, y: 12 }, angle: 0 },
-      { id: "p2", label: "上右", slot: { x: 51, y: 12 }, angle: 90 },
-      { id: "p3", label: "下左", slot: { x: 10, y: 53 }, angle: 180 },
-      { id: "p4", label: "下右", slot: { x: 51, y: 53 }, angle: 270 }
+      { id: "p1", label: "上左", slot: { x: 10, y: 12 }, angle: 0, initialAngle: 90 },
+      { id: "p2", label: "上右", slot: { x: 51, y: 12 }, angle: 90, initialAngle: 225 },
+      { id: "p3", label: "下左", slot: { x: 10, y: 53 }, angle: 180, initialAngle: 315 },
+      { id: "p4", label: "下右", slot: { x: 51, y: 53 }, angle: 270, initialAngle: 45 }
     ]
   },
   tile: {
@@ -289,12 +289,12 @@ const artifactTemplates = {
       23: "p6"
     },
     pieceDefs: [
-      { id: "p1", label: "左上", slot: { x: 5, y: 8 }, angle: 0 },
-      { id: "p2", label: "右上", slot: { x: 55, y: 8 }, angle: 90 },
-      { id: "p3", label: "左中", slot: { x: 5, y: 40 }, angle: 180 },
-      { id: "p4", label: "右中", slot: { x: 55, y: 40 }, angle: 270 },
-      { id: "p5", label: "左下", slot: { x: 5, y: 68 }, angle: 0 },
-      { id: "p6", label: "右下", slot: { x: 55, y: 68 }, angle: 90 }
+      { id: "p1", label: "左上", slot: { x: 5, y: 8 }, angle: 0, initialAngle: 180 },
+      { id: "p2", label: "右上", slot: { x: 55, y: 8 }, angle: 90, initialAngle: 270 },
+      { id: "p3", label: "左中", slot: { x: 5, y: 40 }, angle: 180, initialAngle: 0 },
+      { id: "p4", label: "右中", slot: { x: 55, y: 40 }, angle: 270, initialAngle: 90 },
+      { id: "p5", label: "左下", slot: { x: 5, y: 68 }, angle: 0, initialAngle: 270 },
+      { id: "p6", label: "右下", slot: { x: 55, y: 68 }, angle: 90, initialAngle: 315 }
     ]
   },
   mirror: {
@@ -351,15 +351,15 @@ const artifactTemplates = {
       24: "p9"
     },
     pieceDefs: [
-      { id: "p1", label: "顶", slot: { x: 33, y: 3 }, angle: 0 },
-      { id: "p2", label: "右上", slot: { x: 60, y: 15 }, angle: 45 },
-      { id: "p3", label: "右", slot: { x: 68, y: 38 }, angle: 90 },
-      { id: "p4", label: "右下", slot: { x: 60, y: 62 }, angle: 135 },
-      { id: "p5", label: "底", slot: { x: 33, y: 75 }, angle: 180 },
-      { id: "p6", label: "左下", slot: { x: 8, y: 62 }, angle: 225 },
-      { id: "p7", label: "左", slot: { x: 2, y: 38 }, angle: 270 },
-      { id: "p8", label: "左上", slot: { x: 8, y: 15 }, angle: 315 },
-      { id: "p9", label: "中心", slot: { x: 33, y: 38 }, angle: 0 }
+      { id: "p1", label: "顶", slot: { x: 33, y: 3 }, angle: 0, initialAngle: 135 },
+      { id: "p2", label: "右上", slot: { x: 60, y: 15 }, angle: 45, initialAngle: 225 },
+      { id: "p3", label: "右", slot: { x: 68, y: 38 }, angle: 90, initialAngle: 315 },
+      { id: "p4", label: "右下", slot: { x: 60, y: 62 }, angle: 135, initialAngle: 0 },
+      { id: "p5", label: "底", slot: { x: 33, y: 75 }, angle: 180, initialAngle: 45 },
+      { id: "p6", label: "左下", slot: { x: 8, y: 62 }, angle: 225, initialAngle: 90 },
+      { id: "p7", label: "左", slot: { x: 2, y: 38 }, angle: 270, initialAngle: 180 },
+      { id: "p8", label: "左上", slot: { x: 8, y: 15 }, angle: 315, initialAngle: 270 },
+      { id: "p9", label: "中心", slot: { x: 33, y: 38 }, angle: 0, initialAngle: 180 }
     ]
   }
 };
@@ -1109,7 +1109,7 @@ function spawnPiece(id) {
   const piece = document.createElement("div");
   piece.className = "piece";
   piece.dataset.id = id;
-  piece.dataset.angle = String((def.angle + 90) % 360);
+  piece.dataset.angle = String(def.initialAngle);
   piece.style.width = `${style.width}px`;
   piece.style.height = `${style.height}px`;
   piece.style.background = style.background;
