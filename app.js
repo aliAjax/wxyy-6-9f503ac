@@ -27,6 +27,12 @@ const tutorialSpotlight = document.getElementById("tutorialSpotlight");
 const tutorialTooltip = document.getElementById("tutorialTooltip");
 const levelListEl = document.querySelector(".level-list");
 const hintBtn = document.getElementById("hintBtn");
+const probeBtn = document.getElementById("probeBtn");
+const brushBtn = document.getElementById("brushBtn");
+const compassBtn = document.getElementById("compassBtn");
+const compassIndicator = document.getElementById("compassIndicator");
+const compassArrow = compassIndicator.querySelector(".compass-arrow");
+const compassDistance = compassIndicator.querySelector(".compass-distance");
 
 const ARCHIVE_STORAGE_KEY = "archaeology_archive_records";
 const TUTORIAL_STORAGE_KEY = "archaeology_tutorial_done";
@@ -187,6 +193,104 @@ const SITE_EVENTS = {
       return {
         success: true,
         message: `发现零散遗物！额外加 2 分。`
+      };
+    }
+  }
+};
+
+const TOOLS = {
+  probe: {
+    id: "probe",
+    name: "探针",
+    icon: "📍",
+    baseCount: 2,
+    description: "提示某片陶片所在的大致区域",
+    canUse(state, template) {
+      if (!state.running) return { ok: false, reason: "游戏未开始" };
+      if (state.tools.probe <= 0) return { ok: false, reason: "探针已用完" };
+      const pieceIndices = Object.keys(template.buried).map(Number);
+      const hidden = pieceIndices.filter(i => !state.dug.has(i) && !state.probeHints.has(i));
+      if (hidden.length === 0) return { ok: false, reason: "没有可探测的碎片" };
+      return { ok: true };
+    },
+    use(state, template) {
+      const pieceIndices = Object.keys(template.buried).map(Number);
+      const hidden = pieceIndices.filter(i => !state.dug.has(i) && !state.probeHints.has(i));
+      const targetIdx = hidden[Math.floor(Math.random() * hidden.length)];
+      const cols = Math.sqrt(template.gridSize || 25);
+      const row = Math.floor(targetIdx / cols);
+      const col = targetIdx % cols;
+      const areaCells = [];
+      for (let dr = -1; dr <= 1; dr++) {
+        for (let dc = -1; dc <= 1; dc++) {
+          const nr = row + dr;
+          const nc = col + dc;
+          if (nr >= 0 && nr < cols && nc >= 0 && nc < cols) {
+            const idx = nr * cols + nc;
+            if (!state.dug.has(idx)) {
+              areaCells.push(idx);
+              state.probeHints.add(idx);
+            }
+          }
+        }
+      }
+      state.tools.probe -= 1;
+      state.toolsUsed.probe += 1;
+      const def = template.pieceDefs.find(p => p.id === template.buried[targetIdx]);
+      return {
+        success: true,
+        message: `探针探测：${def ? def.label : "某件"}${template.pieceName}位于第${row + 1}行第${col + 1}列附近区域，已高亮 ${areaCells.length} 格。`,
+        cells: areaCells
+      };
+    }
+  },
+  brush: {
+    id: "brush",
+    name: "刷子",
+    icon: "🖌️",
+    baseCount: 3,
+    description: "安全清理一格，不触发随机事件",
+    canUse(state, template) {
+      if (!state.running) return { ok: false, reason: "游戏未开始" };
+      if (state.tools.brush <= 0) return { ok: false, reason: "刷子已用完" };
+      const undug = [];
+      for (let i = 0; i < (template.gridSize || 25); i++) {
+        if (!state.dug.has(i) && !state.lockedCells.has(i)) undug.push(i);
+      }
+      if (undug.length === 0) return { ok: false, reason: "没有可清理的格子" };
+      return { ok: true };
+    },
+    use(state, template) {
+      state.activeTool = "brush";
+      return {
+        success: true,
+        message: "刷子模式：点击一格进行安全清理，不会触发随机事件。",
+        activateMode: true
+      };
+    }
+  },
+  compass: {
+    id: "compass",
+    name: "罗盘",
+    icon: "🧭",
+    baseCount: 2,
+    description: "拖动陶片时显示距离正确槽位的方向",
+    canUse(state, template) {
+      if (!state.running) return { ok: false, reason: "游戏未开始" };
+      if (state.tools.compass <= 0) return { ok: false, reason: "罗盘已用完" };
+      const unlockedPieces = Array.from(state.found).filter(p => !state.locked.has(p));
+      if (unlockedPieces.length === 0) return { ok: false, reason: "没有可拖动的碎片" };
+      return { ok: true };
+    },
+    use(state, template) {
+      state.activeTool = "compass";
+      state.compassActive = true;
+      state.tools.compass -= 1;
+      state.toolsUsed.compass += 1;
+      return {
+        success: true,
+        message: "罗盘已激活：拖动碎片时将显示指向正确位置的方向箭头。",
+        activateMode: true
       };
     }
   }
@@ -519,8 +623,27 @@ function createRecordCard(record, showBadge = false) {
     stats.appendChild(angleStat);
   }
 
+  if (record.toolsUsed !== undefined) {
+    const toolStat = document.createElement("div");
+    toolStat.className = "record-stat";
+    const totalTools = record.toolsUsed.probe + record.toolsUsed.brush + record.toolsUsed.compass;
+    toolStat.innerHTML = `<div class="record-stat-label">道具使用</div><div class="record-stat-value">${totalTools}次</div>`;
+    stats.appendChild(toolStat);
+  }
+
   card.appendChild(header);
   card.appendChild(stats);
+
+  if (record.toolsUsed !== undefined && (record.toolsUsed.probe > 0 || record.toolsUsed.brush > 0 || record.toolsUsed.compass > 0)) {
+    const toolsDiv = document.createElement("div");
+    toolsDiv.className = "record-tools";
+    const toolList = [];
+    if (record.toolsUsed.probe > 0) toolList.push(`📍 探针×${record.toolsUsed.probe}`);
+    if (record.toolsUsed.brush > 0) toolList.push(`🖌️ 刷子×${record.toolsUsed.brush}`);
+    if (record.toolsUsed.compass > 0) toolList.push(`🧭 罗盘×${record.toolsUsed.compass}`);
+    toolsDiv.innerHTML = `<span class="record-tools-label">使用道具：</span>${toolList.join(" · ")}`;
+    card.appendChild(toolsDiv);
+  }
 
   if (record.keyEvents && record.keyEvents.length > 0) {
     const eventsDiv = document.createElement("div");
@@ -643,7 +766,20 @@ function freshState() {
     keyEvents: [],
     eventCooldowns: {},
     wrongAngleAttempts: 0,
-    hintsUsed: 0
+    hintsUsed: 0,
+    tools: {
+      probe: TOOLS.probe.baseCount,
+      brush: TOOLS.brush.baseCount,
+      compass: TOOLS.compass.baseCount
+    },
+    toolsUsed: {
+      probe: 0,
+      brush: 0,
+      compass: 0
+    },
+    probeHints: new Set(),
+    activeTool: null,
+    compassActive: false
   };
 }
 
@@ -797,8 +933,10 @@ function calculateExpertScore(template) {
   const positiveCount = state.triggeredEvents.filter(e => e.type === "positive").length;
   const eventScore = Math.round(Math.max(0, Math.min(100, 60 - negativeCount * 12 + positiveCount * 8)));
   const hintScore = state.hintsUsed === 0 ? 100 : Math.round(Math.max(0, 100 - state.hintsUsed * 30));
-  const totalScore = Math.round((timeScore + digScore + angleScore + eventScore + hintScore) / 5);
-  return { timeScore, digScore, angleScore, eventScore, hintScore, totalScore };
+  const toolPenalty = (state.toolsUsed.probe * 15) + (state.toolsUsed.brush * 10) + (state.toolsUsed.compass * 20);
+  const toolScore = Math.round(Math.max(0, 100 - toolPenalty));
+  const totalScore = Math.round((timeScore + digScore + angleScore + eventScore + hintScore + toolScore) / 6);
+  return { timeScore, digScore, angleScore, eventScore, hintScore, toolScore, totalScore };
 }
 
 function getRating(score) {
@@ -1063,6 +1201,18 @@ function init() {
   cancelClearBtn.addEventListener("click", closeConfirmModal);
   confirmClearBtn.addEventListener("click", clearArchive);
 
+  probeBtn.addEventListener("click", () => useTool("probe"));
+  brushBtn.addEventListener("click", () => useTool("brush"));
+  compassBtn.addEventListener("click", () => useTool("compass"));
+
+  document.addEventListener("keydown", (e) => {
+    if (!state || !state.running) return;
+    if (e.key === "1") useTool("probe");
+    if (e.key === "2") useTool("brush");
+    if (e.key === "3") useTool("compass");
+    if (e.key === "Escape") cancelToolMode();
+  });
+
   tutorialBtn.addEventListener("click", () => {
     if (tutorial.active) {
       tutorial.skip();
@@ -1156,12 +1306,19 @@ function reset() {
   state = freshState();
   piecesEl.innerHTML = "";
   resultEl.classList.add("hidden");
+  compassIndicator.classList.add("hidden");
   resetStatsDisplay(currentTemplate);
   render();
 }
 
 function dig(index) {
   if (!state.running || state.dug.has(index) || state.lockedCells.has(index)) return;
+
+  if (state.activeTool === "brush") {
+    brushDig(index);
+    return;
+  }
+
   const template = artifactTemplates[currentTemplate];
   state.dug.add(index);
   state.digs += 1;
@@ -1178,6 +1335,49 @@ function dig(index) {
   render();
 }
 
+function updateCompass(piece, clientX, clientY) {
+  if (!state.compassActive || !state.running) return;
+
+  const template = artifactTemplates[currentTemplate];
+  const id = piece.dataset.id;
+  const def = template.pieceDefs.find((item) => item.id === id);
+  if (!def) return;
+
+  const pieceRect = piece.getBoundingClientRect();
+  const targetRect = targetEl.getBoundingClientRect();
+  const centerX = pieceRect.left + pieceRect.width / 2;
+  const centerY = pieceRect.top + pieceRect.height / 2;
+  const targetX = targetRect.left + targetRect.width * (def.slot.x + 18) / 100;
+  const targetY = targetRect.top + targetRect.height * (def.slot.y + 18) / 100;
+
+  const dx = targetX - centerX;
+  const dy = targetY - centerY;
+  const distance = Math.hypot(dx, dy);
+  const angle = Math.atan2(dy, dx) * 180 / Math.PI + 90;
+
+  compassIndicator.classList.remove("hidden");
+  compassIndicator.style.left = `${clientX}px`;
+  compassIndicator.style.top = `${clientY - 40}px`;
+  compassArrow.style.transform = `translate(-50%, -100%) rotate(${angle}deg)`;
+
+  let distanceText = "";
+  const snapRadius = template.snapRadius;
+  if (distance < snapRadius) {
+    distanceText = "很近！";
+  } else if (distance < snapRadius * 2) {
+    distanceText = "较近";
+  } else if (distance < snapRadius * 4) {
+    distanceText = "中等";
+  } else {
+    distanceText = "较远";
+  }
+  compassDistance.textContent = `${Math.round(distance)}px · ${distanceText}`;
+}
+
+function hideCompass() {
+  compassIndicator.classList.add("hidden");
+}
+
 function useHint() {
   if (!state.running) return;
   const template = artifactTemplates[currentTemplate];
@@ -1192,6 +1392,77 @@ function useHint() {
   state.hintsUsed += 1;
   const def = template.pieceDefs.find(p => p.id === template.buried[targetIdx]);
   addLog(`提示：${def ? def.label : "某件"}${template.pieceName}的位置已标记。`);
+  render();
+}
+
+function useTool(toolId) {
+  if (!state.running) return;
+  const template = artifactTemplates[currentTemplate];
+  const tool = TOOLS[toolId];
+
+  if (state.activeTool === toolId) {
+    cancelToolMode();
+    return;
+  }
+
+  const check = tool.canUse(state, template);
+  if (!check.ok) {
+    addLog(`无法使用${tool.name}：${check.reason}`);
+    render();
+    return;
+  }
+
+  if (state.activeTool && state.activeTool !== toolId) {
+    cancelToolMode(false);
+  }
+
+  const result = tool.use(state, template);
+  if (result.success) {
+    addLog(result.message);
+    if (result.activateMode) {
+      renderTools();
+      renderGrid();
+      return;
+    }
+  }
+  render();
+}
+
+function cancelToolMode(renderLog = true) {
+  if (state.activeTool === "brush" && state.tools.brush > 0) {
+    state.activeTool = null;
+    if (renderLog) addLog("已取消刷子模式。");
+  } else if (state.activeTool === "compass") {
+    state.activeTool = null;
+    state.compassActive = false;
+    compassIndicator.classList.add("hidden");
+    if (renderLog) addLog("已关闭罗盘。");
+  } else {
+    state.activeTool = null;
+  }
+  renderTools();
+  renderGrid();
+}
+
+function brushDig(index) {
+  if (!state.running || state.dug.has(index) || state.lockedCells.has(index)) return;
+  const template = artifactTemplates[currentTemplate];
+
+  state.dug.add(index);
+  state.tools.brush -= 1;
+  state.toolsUsed.brush += 1;
+  state.activeTool = null;
+
+  if (template.buried[index]) {
+    const id = template.buried[index];
+    state.found.add(id);
+    addLog(`[刷子] 安全清理出${template.pieceDefs.find((p) => p.id === id).label}${template.pieceName}。`);
+    spawnPiece(id);
+    tutorial.notifyAction("dig");
+  } else {
+    addLog("[刷子] 安全清理，这一格只有松土和碎砂。");
+  }
+
   render();
 }
 
@@ -1256,12 +1527,14 @@ function dragMove(event) {
   const rect = piecesEl.getBoundingClientRect();
   dragging.piece.style.left = `${event.clientX - rect.left - 50}px`;
   dragging.piece.style.top = `${event.clientY - rect.top - 50}px`;
+  updateCompass(dragging.piece, event.clientX, event.clientY);
 }
 
 function endDrag(event) {
   const piece = event.currentTarget;
   piece.removeEventListener("pointermove", dragMove);
   dragging = null;
+  hideCompass();
   tutorial.notifyAction("drag");
   trySnap(piece);
 }
@@ -1373,6 +1646,17 @@ function finish(success, message) {
             <div class="score-bar"><div class="score-bar-fill" style="width:${scores.hintScore}%;background:${getScoreColor(scores.hintScore)}"></div></div>
             <div class="score-value" style="color:${getScoreColor(scores.hintScore)}">${scores.hintScore}</div>
           </div>
+          <div class="settlement-score-item">
+            <div class="score-label">工具使用</div>
+            <div class="score-bar"><div class="score-bar-fill" style="width:${scores.toolScore}%;background:${getScoreColor(scores.toolScore)}"></div></div>
+            <div class="score-value" style="color:${getScoreColor(scores.toolScore)}">${scores.toolScore}</div>
+          </div>
+        </div>
+        <div class="settlement-tools-used">
+          <span class="tools-used-label">道具使用：</span>
+          <span class="tool-used-item">📍 探针 ${state.toolsUsed.probe}</span>
+          <span class="tool-used-item">🖌️ 刷子 ${state.toolsUsed.brush}</span>
+          <span class="tool-used-item">🧭 罗盘 ${state.toolsUsed.compass}</span>
         </div>
         <div class="settlement-commentary">${commentary}</div>
       </div>`;
@@ -1391,6 +1675,7 @@ function finish(success, message) {
       bonusScore: state.bonusScore,
       hintsUsed: state.hintsUsed,
       wrongAngleAttempts: state.wrongAngleAttempts,
+      toolsUsed: { ...state.toolsUsed },
       completedAt: Date.now()
     };
     archive.addRecord(record);
@@ -1430,6 +1715,17 @@ function finish(success, message) {
             <div class="score-bar"><div class="score-bar-fill" style="width:${scores.hintScore}%;background:${getScoreColor(scores.hintScore)}"></div></div>
             <div class="score-value" style="color:${getScoreColor(scores.hintScore)}">${scores.hintScore}</div>
           </div>
+          <div class="settlement-score-item">
+            <div class="score-label">工具使用</div>
+            <div class="score-bar"><div class="score-bar-fill" style="width:${scores.toolScore}%;background:${getScoreColor(scores.toolScore)}"></div></div>
+            <div class="score-value" style="color:${getScoreColor(scores.toolScore)}">${scores.toolScore}</div>
+          </div>
+        </div>
+        <div class="settlement-tools-used">
+          <span class="tools-used-label">道具使用：</span>
+          <span class="tool-used-item">📍 探针 ${state.toolsUsed.probe}</span>
+          <span class="tool-used-item">🖌️ 刷子 ${state.toolsUsed.brush}</span>
+          <span class="tool-used-item">🧭 罗盘 ${state.toolsUsed.compass}</span>
         </div>
         <div class="settlement-commentary">修复未能完成，考古现场需更严谨的操作与更充分的准备。</div>
       </div>`;
@@ -1453,6 +1749,7 @@ function render() {
   renderStats();
   renderGrid();
   renderLog();
+  renderTools();
   startBtn.disabled = state.running;
   hintBtn.disabled = !state.running;
 }
@@ -1464,12 +1761,37 @@ function renderStats() {
   progressEl.textContent = `${Math.round((state.locked.size / template.pieceDefs.length) * 100)}%`;
 }
 
+function renderTools() {
+  const template = artifactTemplates[currentTemplate];
+
+  function renderToolButton(btnEl, toolId) {
+    const tool = TOOLS[toolId];
+    const check = tool.canUse(state, template);
+    const isActive = state.activeTool === toolId;
+
+    btnEl.innerHTML = `
+      <span class="tool-icon">${tool.icon}</span>
+      <span class="tool-name">${tool.name}</span>
+      <span class="tool-count">${state.tools[toolId]}</span>
+    `;
+    btnEl.title = `${tool.name}：${tool.description}（剩余${state.tools[toolId]}次）`;
+    btnEl.disabled = !check.ok && !isActive;
+    btnEl.classList.toggle("active", isActive);
+  }
+
+  renderToolButton(probeBtn, "probe");
+  renderToolButton(brushBtn, "brush");
+  renderToolButton(compassBtn, "compass");
+}
+
 function renderGrid() {
   const template = artifactTemplates[currentTemplate];
   gridEl.innerHTML = "";
   const gridSize = template.gridSize || 25;
   const cols = Math.sqrt(gridSize);
   gridEl.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+  gridEl.classList.toggle("brush-mode", state.activeTool === "brush");
+
   for (let i = 0; i < gridSize; i += 1) {
     const cell = document.createElement("button");
     cell.type = "button";
@@ -1478,12 +1800,17 @@ function renderGrid() {
     if (state.found.has(template.buried[i])) cell.classList.add("found");
     if (state.lockedCells.has(i)) cell.classList.add("locked-cell");
     if (state.hintedCells.has(i) && !state.dug.has(i)) cell.classList.add("hinted");
+    if (state.probeHints.has(i) && !state.dug.has(i)) cell.classList.add("probe-hinted");
+    if (state.activeTool === "brush") cell.classList.add("brush-mode");
+
     if (state.dug.has(i)) {
       cell.textContent = template.buried[i] ? template.pieceName : "土";
     } else if (state.lockedCells.has(i)) {
       cell.textContent = "⚠";
     } else if (state.hintedCells.has(i)) {
       cell.textContent = "?";
+    } else if (state.probeHints.has(i)) {
+      cell.textContent = "◎";
     } else {
       cell.textContent = "";
     }
