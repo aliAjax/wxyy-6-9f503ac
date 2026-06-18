@@ -132,8 +132,7 @@ const SITE_EVENTS = {
       state.toolWear += 1;
       return {
         success: true,
-        message: `手铲刃口磨损，本轮评分将受影响。`,
-        silent: state.toolWear > 1
+        message: `手铲刃口磨损，本轮评分将受影响。`
       };
     }
   },
@@ -147,7 +146,7 @@ const SITE_EVENTS = {
     key: true,
     apply(state, level) {
       if (state.timeLeft < level.timeLimit) {
-        const bonus = 8;
+        const bonus = Math.min(8, level.timeLimit - state.timeLeft);
         state.timeLeft += bonus;
         return {
           success: true,
