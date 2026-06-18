@@ -25,6 +25,7 @@ const tutorialBtn = document.getElementById("tutorialBtn");
 const tutorialOverlay = document.getElementById("tutorialOverlay");
 const tutorialSpotlight = document.getElementById("tutorialSpotlight");
 const tutorialTooltip = document.getElementById("tutorialTooltip");
+const levelListEl = document.querySelector(".level-list");
 
 const ARCHIVE_STORAGE_KEY = "archaeology_archive_records";
 const TUTORIAL_STORAGE_KEY = "archaeology_tutorial_done";
@@ -38,9 +39,9 @@ const SITE_EVENTS = {
     cooldown: 2,
     description: "探方侧壁发生塌方",
     key: true,
-    apply(state, level) {
+    apply(state, template) {
       const cellCount = 25;
-      const pieceIndices = Object.keys(level.buried).map(Number);
+      const pieceIndices = Object.keys(template.buried).map(Number);
       const lockable = [];
       for (let i = 0; i < cellCount; i++) {
         if (!state.dug.has(i) && !state.lockedCells.has(i) && !pieceIndices.includes(i)) {
@@ -53,9 +54,8 @@ const SITE_EVENTS = {
           foundPieceIndices.push(pi);
         }
       }
-      const availablePieceCount = foundPieceIndices.length;
       const remainingPieces = pieceIndices.filter(
-        (pi) => !state.dug.has(pi) && !state.found.has(level.buried[pi])
+        (pi) => !state.dug.has(pi) && !state.found.has(template.buried[pi])
       ).length;
       let lockCount = Math.min(2, lockable.length);
       if (lockable.length > 0 && remainingPieces > 2) {
@@ -82,7 +82,7 @@ const SITE_EVENTS = {
     cooldown: 3,
     description: "突降雨水，作业暂停",
     key: true,
-    apply(state, level) {
+    apply(state, template) {
       const minTimeLeft = 15;
       const penalty = Math.min(10, state.timeLeft - minTimeLeft);
       if (penalty > 0) {
@@ -103,18 +103,18 @@ const SITE_EVENTS = {
     cooldown: 4,
     description: "发现文化层标记",
     key: true,
-    apply(state, level) {
-      const pieceIndices = Object.keys(level.buried).map(Number);
+    apply(state, template) {
+      const pieceIndices = Object.keys(template.buried).map(Number);
       const hiddenPieces = pieceIndices.filter(
         (i) => !state.dug.has(i) && !state.hintedCells.has(i)
       );
       if (hiddenPieces.length > 0) {
         const targetIdx = hiddenPieces[Math.floor(Math.random() * hiddenPieces.length)];
         state.hintedCells.add(targetIdx);
-        const def = level.pieceDefs.find((p) => p.id === level.buried[targetIdx]);
+        const def = template.pieceDefs.find((p) => p.id === template.buried[targetIdx]);
         return {
           success: true,
-          message: `发现文化层标记！${def ? def.label : "某件"}${level.pieceName}附近有标识。`
+          message: `发现文化层标记！${def ? def.label : "某件"}${template.pieceName}附近有标识。`
         };
       }
       return { success: false };
@@ -128,7 +128,7 @@ const SITE_EVENTS = {
     cooldown: 1,
     description: "发掘工具磨损",
     key: false,
-    apply(state, level) {
+    apply(state, template) {
       state.toolWear += 1;
       return {
         success: true,
@@ -144,9 +144,9 @@ const SITE_EVENTS = {
     cooldown: 5,
     description: "天气晴朗，光线充足",
     key: true,
-    apply(state, level) {
-      if (state.timeLeft < level.timeLimit) {
-        const bonus = Math.min(8, level.timeLimit - state.timeLeft);
+    apply(state, template) {
+      if (state.timeLeft < template.timeLimit) {
+        const bonus = Math.min(8, template.timeLimit - state.timeLeft);
         state.timeLeft += bonus;
         return {
           success: true,
@@ -164,7 +164,7 @@ const SITE_EVENTS = {
     cooldown: 3,
     description: "发现古人活动痕迹",
     key: true,
-    apply(state, level) {
+    apply(state, template) {
       state.bonusScore += 5;
       return {
         success: true,
@@ -180,7 +180,7 @@ const SITE_EVENTS = {
     cooldown: 2,
     description: "发现零散遗物",
     key: false,
-    apply(state, level) {
+    apply(state, template) {
       state.bonusScore += 2;
       return {
         success: true,
@@ -190,13 +190,45 @@ const SITE_EVENTS = {
   }
 };
 
-const levels = {
+const artifactTemplates = {
   bowl: {
+    id: "bowl",
     name: "陶碗",
     pieceName: "陶片",
     timeLimit: 90,
-    targetClass: "bowl-target",
-    pieceClass: "bowl-piece",
+    difficulty: "初级",
+    snapRadius: 72,
+    gridSize: 25,
+    iconClass: "bowl-icon",
+    target: {
+      shape: "circle",
+      style: {
+        background: "#c28c59",
+        borderColor: "#7a432d",
+        borderWidth: 8,
+        innerRingColor: "#d6a873",
+        innerRingWidth: 12,
+        innerCircleColor: "#7a432d",
+        innerCircleWidth: 6,
+        innerCircleInset: "28%"
+      }
+    },
+    piece: {
+      style: {
+        width: 100,
+        height: 100,
+        background: "#cd915c",
+        borderColor: "#7a432d",
+        borderWidth: 4,
+        borderRadius: "18px 8px 22px 10px",
+        lockedBackground: "#d6a873",
+        innerDecorationType: "circle",
+        innerDecorationInset: "20px",
+        innerDecorationBorderWidth: 4,
+        innerDecorationBorderColor: "rgba(99, 54, 36, .75)",
+        innerDecorationRadius: "50%"
+      }
+    },
     buried: {
       2: "p1",
       7: "p2",
@@ -211,11 +243,43 @@ const levels = {
     ]
   },
   tile: {
+    id: "tile",
     name: "瓦当",
     pieceName: "瓦当残片",
     timeLimit: 120,
-    targetClass: "tile-target",
-    pieceClass: "tile-piece",
+    difficulty: "中级",
+    snapRadius: 60,
+    gridSize: 25,
+    iconClass: "tile-icon",
+    target: {
+      shape: "tile",
+      style: {
+        background: "#a08465",
+        borderColor: "#4a3728",
+        borderWidth: 8,
+        innerRingColor: "#b89874",
+        innerRingWidth: 12,
+        innerCircleColor: "#4a3728",
+        innerCircleWidth: 6,
+        innerCircleSize: "35%"
+      }
+    },
+    piece: {
+      style: {
+        width: 100,
+        height: 100,
+        background: "#a08465",
+        borderColor: "#4a3728",
+        borderWidth: 4,
+        borderRadius: "12px 12px 4px 4px",
+        lockedBackground: "#b89874",
+        innerDecorationType: "rect",
+        innerDecorationInset: "20px",
+        innerDecorationBorderWidth: 4,
+        innerDecorationBorderColor: "rgba(74, 55, 40, .75)",
+        innerDecorationRadius: "4px"
+      }
+    },
     buried: {
       1: "p1",
       5: "p2",
@@ -234,11 +298,47 @@ const levels = {
     ]
   },
   mirror: {
+    id: "mirror",
     name: "青铜镜",
     pieceName: "铜镜残片",
     timeLimit: 180,
-    targetClass: "mirror-target",
-    pieceClass: "mirror-piece",
+    difficulty: "高级",
+    snapRadius: 50,
+    gridSize: 25,
+    iconClass: "mirror-icon",
+    target: {
+      shape: "mirror",
+      style: {
+        background: "#7a8b94",
+        borderColor: "#2d3e45",
+        borderWidth: 8,
+        innerRingColor: "#95a5ae",
+        innerRingWidth: 12,
+        innerCircleColor: "#2d3e45",
+        innerCircleWidth: 6,
+        innerCircleInset: "20%",
+        innerCircleFill: "#4a5b63",
+        centerKnobColor: "#c49b62",
+        centerKnobBorder: "#7a432d",
+        centerKnobSize: "12%"
+      }
+    },
+    piece: {
+      style: {
+        width: 100,
+        height: 100,
+        background: "#7a8b94",
+        borderColor: "#2d3e45",
+        borderWidth: 4,
+        borderRadius: "50%",
+        lockedBackground: "#95a5ae",
+        innerDecorationType: "circle",
+        innerDecorationInset: "22px",
+        innerDecorationBorderWidth: 4,
+        innerDecorationBorderColor: "rgba(45, 62, 69, .75)",
+        innerDecorationRadius: "50%"
+      }
+    },
     buried: {
       0: "p1",
       4: "p2",
@@ -264,7 +364,7 @@ const levels = {
   }
 };
 
-let currentLevel = null;
+let currentTemplate = null;
 let state;
 let timer;
 let dragging = null;
@@ -330,9 +430,9 @@ const archive = {
       }
     }
 
+    const templateOrder = Object.keys(artifactTemplates);
     return Object.values(bestByLevel).sort((a, b) => {
-      const levelOrder = ["bowl", "tile", "mirror"];
-      return levelOrder.indexOf(a.levelId) - levelOrder.indexOf(b.levelId);
+      return templateOrder.indexOf(a.levelId) - templateOrder.indexOf(b.levelId);
     });
   }
 };
@@ -471,16 +571,40 @@ function clearArchive() {
   closeConfirmModal();
 }
 
+function renderLevelCards() {
+  levelListEl.innerHTML = "";
+  Object.values(artifactTemplates).forEach((template) => {
+    const card = document.createElement("button");
+    card.className = "level-card";
+    card.dataset.level = template.id;
+
+    const icon = document.createElement("div");
+    icon.className = `level-icon ${template.iconClass}`;
+
+    const info = document.createElement("div");
+    info.className = "level-info";
+    info.innerHTML = `
+      <h3>${template.name}修复</h3>
+      <p>${template.pieceDefs.length} 片碎片 · ${template.timeLimit} 秒 · ${template.difficulty}</p>
+    `;
+
+    card.appendChild(icon);
+    card.appendChild(info);
+    card.addEventListener("click", () => selectLevel(template.id));
+    levelListEl.appendChild(card);
+  });
+}
+
 function freshState() {
-  const level = levels[currentLevel];
+  const template = artifactTemplates[currentTemplate];
   return {
     running: false,
-    timeLeft: level.timeLimit,
+    timeLeft: template.timeLimit,
     digs: 0,
     dug: new Set(),
     found: new Set(),
     locked: new Set(),
-    log: [`探方已经布好，先从泥土里找${level.pieceName}。`],
+    log: [`探方已经布好，先从泥土里找${template.pieceName}。`],
     lockedCells: new Set(),
     hintedCells: new Set(),
     toolWear: 0,
@@ -491,9 +615,9 @@ function freshState() {
   };
 }
 
-function resetStatsDisplay(levelId) {
-  if (levelId && levels[levelId]) {
-    timeLeftEl.textContent = String(levels[levelId].timeLimit);
+function resetStatsDisplay(templateId) {
+  if (templateId && artifactTemplates[templateId]) {
+    timeLeftEl.textContent = String(artifactTemplates[templateId].timeLimit);
   } else {
     timeLeftEl.textContent = "90";
   }
@@ -501,8 +625,83 @@ function resetStatsDisplay(levelId) {
   progressEl.textContent = "0%";
 }
 
+function renderTarget() {
+  const template = artifactTemplates[currentTemplate];
+  const style = template.target.style;
+  targetEl.style.background = style.background;
+  targetEl.style.borderColor = style.borderColor;
+  targetEl.style.borderWidth = `${style.borderWidth}px`;
+  targetEl.style.borderStyle = "solid";
+  targetEl.style.boxShadow = `inset 0 0 0 ${style.innerRingWidth}px ${style.innerRingColor}`;
+
+  if (template.target.shape === "circle" || template.target.shape === "mirror") {
+    targetEl.style.borderRadius = "50%";
+  } else if (template.target.shape === "tile") {
+    targetEl.style.borderRadius = "12px 12px 4px 4px";
+  }
+
+  targetEl.innerHTML = "";
+
+  const innerCircle = document.createElement("div");
+  innerCircle.className = "target-inner-circle";
+
+  if (template.target.shape === "tile") {
+    innerCircle.style.width = style.innerCircleSize;
+    innerCircle.style.height = style.innerCircleSize;
+    innerCircle.style.top = "50%";
+    innerCircle.style.left = "50%";
+    innerCircle.style.transform = "translate(-50%, -50%)";
+  } else {
+    innerCircle.style.top = style.innerCircleInset;
+    innerCircle.style.right = style.innerCircleInset;
+    innerCircle.style.bottom = style.innerCircleInset;
+    innerCircle.style.left = style.innerCircleInset;
+  }
+
+  innerCircle.style.border = `${style.innerCircleWidth}px solid ${style.innerCircleColor}`;
+  innerCircle.style.borderRadius = "50%";
+
+  if (style.innerCircleFill) {
+    innerCircle.style.background = style.innerCircleFill;
+  }
+
+  targetEl.appendChild(innerCircle);
+
+  if (template.target.shape === "mirror" && style.centerKnobSize) {
+    const centerKnob = document.createElement("div");
+    centerKnob.className = "target-center-knob";
+    centerKnob.style.width = style.centerKnobSize;
+    centerKnob.style.height = style.centerKnobSize;
+    centerKnob.style.background = style.centerKnobColor;
+    centerKnob.style.border = `4px solid ${style.centerKnobBorder}`;
+    centerKnob.style.borderRadius = "50%";
+    centerKnob.style.position = "absolute";
+    centerKnob.style.top = "50%";
+    centerKnob.style.left = "50%";
+    centerKnob.style.transform = "translate(-50%, -50%)";
+    centerKnob.style.zIndex = "1";
+    targetEl.appendChild(centerKnob);
+  }
+
+  template.pieceDefs.forEach((def) => {
+    const slot = document.createElement("div");
+    slot.className = "slot";
+    slot.dataset.pieceId = def.id;
+    slot.style.left = `${def.slot.x}%`;
+    slot.style.top = `${def.slot.y}%`;
+    slot.style.transform = `rotate(${def.angle}deg)`;
+    slot.style.width = `${template.piece.style.width * 0.6}px`;
+    slot.style.height = `${template.piece.style.height * 0.6}px`;
+    slot.style.border = "2px dashed rgba(49, 76, 83, .35)";
+    slot.style.borderRadius = template.piece.style.borderRadius;
+    slot.style.position = "absolute";
+    slot.style.pointerEvents = "none";
+    targetEl.appendChild(slot);
+  });
+}
+
 function tryTriggerEvent() {
-  const level = levels[currentLevel];
+  const template = artifactTemplates[currentTemplate];
   const events = Object.values(SITE_EVENTS);
   const availableEvents = events.filter((evt) => {
     const cooldown = state.eventCooldowns[evt.id] || 0;
@@ -511,7 +710,7 @@ function tryTriggerEvent() {
 
   for (const evt of availableEvents) {
     if (Math.random() < evt.probability) {
-      const result = evt.apply(state, level);
+      const result = evt.apply(state, template);
       if (result.success) {
         state.triggeredEvents.push({
           id: evt.id,
@@ -556,10 +755,10 @@ function tryTriggerEvent() {
   return null;
 }
 
-function calculateFinalScore(level) {
-  const baseScore = Math.round((state.locked.size / level.pieceDefs.length) * 100);
+function calculateFinalScore(template) {
+  const baseScore = Math.round((state.locked.size / template.pieceDefs.length) * 100);
   const timeBonus = Math.max(0, state.timeLeft);
-  const digPenalty = Math.max(0, state.digs - level.pieceDefs.length) * 2;
+  const digPenalty = Math.max(0, state.digs - template.pieceDefs.length) * 2;
   const wearPenalty = state.toolWear * 3;
   const finalScore = Math.max(0, baseScore + state.bonusScore + Math.floor(timeBonus / 5) - digPenalty - wearPenalty);
   return {
@@ -588,7 +787,7 @@ const tutorial = {
     },
     {
       target: "#grid",
-      text: "在探方网格中逐格点击进行挖掘，有的格子藏着碎片，有的只有泥土。继续挖掘，直到发现第一片陶片吧！",
+      text: "在探方网格中逐格点击进行挖掘，有的格子藏着碎片，有的只有泥土。继续挖掘，直到发现第一片碎片吧！",
       arrow: "right",
       action: "dig"
     },
@@ -645,8 +844,8 @@ const tutorial = {
     if (this.active) return;
     this.active = true;
     this.reset();
-    
-    if (!currentLevel) {
+
+    if (!currentTemplate) {
       selectLevel(levelId, true);
     } else {
       reset();
@@ -656,7 +855,7 @@ const tutorial = {
       }, 100);
       return;
     }
-    
+
     setTimeout(() => {
       tutorialOverlay.classList.remove("hidden");
       this.showStep();
@@ -674,7 +873,7 @@ const tutorial = {
 
   next() {
     if (this.waitingForAction) return;
-    
+
     this.current += 1;
     if (this.current >= this.steps.length) {
       this.end();
@@ -689,14 +888,14 @@ const tutorial = {
 
   notifyAction(action) {
     if (!this.active || !this.waitingForAction) return;
-    
+
     const step = this.steps[this.current];
     if (step.action === action) {
       this.waitingForAction = false;
       const nextBtn = tutorialTooltip.querySelector(".tutorial-next-btn");
       nextBtn.disabled = false;
       nextBtn.textContent = this.current === this.steps.length - 1 ? "完成" : "下一步";
-      
+
       if (action === "snap") {
         setTimeout(() => this.next(), 800);
       }
@@ -711,7 +910,7 @@ const tutorial = {
 
     indicator.textContent = `${this.current + 1} / ${this.steps.length}`;
     text.textContent = step.text;
-    
+
     this.waitingForAction = step.action !== null && step.action !== "snap";
     nextBtn.disabled = this.waitingForAction;
     nextBtn.textContent = this.waitingForAction ? "请先完成操作" : (this.current === this.steps.length - 1 ? "完成" : "下一步");
@@ -777,9 +976,7 @@ const tutorial = {
 };
 
 function init() {
-  document.querySelectorAll(".level-card").forEach((card) => {
-    card.addEventListener("click", () => selectLevel(card.dataset.level));
-  });
+  renderLevelCards();
   startBtn.addEventListener("click", start);
   restartBtn.addEventListener("click", reset);
   backBtn.addEventListener("click", goBack);
@@ -828,18 +1025,19 @@ function init() {
   backBtn.classList.add("hidden");
 }
 
-function selectLevel(levelId, skipAutoTutorial = false) {
-  currentLevel = levelId;
-  const level = levels[levelId];
-  levelNameEl.textContent = level.name;
-  targetEl.className = `target ${level.targetClass}`;
+function selectLevel(templateId, skipAutoTutorial = false) {
+  currentTemplate = templateId;
+  const template = artifactTemplates[templateId];
+  levelNameEl.textContent = template.name;
+  targetEl.className = "target";
+  renderTarget();
   levelSelectEl.classList.add("hidden");
   gameAreaEl.classList.remove("hidden");
   backBtn.classList.remove("hidden");
   state = freshState();
   piecesEl.innerHTML = "";
   resultEl.classList.add("hidden");
-  resetStatsDisplay(levelId);
+  resetStatsDisplay(templateId);
   render();
 
   if (!skipAutoTutorial && !tutorial.isDone() && !tutorial.active) {
@@ -850,7 +1048,7 @@ function selectLevel(levelId, skipAutoTutorial = false) {
 function goBack() {
   clearInterval(timer);
   if (tutorial.active) tutorial.skip();
-  currentLevel = null;
+  currentTemplate = null;
   levelSelectEl.classList.remove("hidden");
   gameAreaEl.classList.add("hidden");
   resultEl.classList.add("hidden");
@@ -863,12 +1061,12 @@ function start() {
   if (state.running) return;
   state.running = true;
   resultEl.classList.add("hidden");
-  const level = levels[currentLevel];
-  addLog(`计时开始，${level.name}进入抢救性发掘。`);
+  const template = artifactTemplates[currentTemplate];
+  addLog(`计时开始，${template.name}进入抢救性发掘。`);
   timer = setInterval(() => {
     state.timeLeft -= 1;
     if (state.timeLeft <= 0) {
-      finish(false, `时间到了，${level.name}没能完整修复。`);
+      finish(false, `时间到了，${template.name}没能完整修复。`);
     }
     renderStats();
   }, 1000);
@@ -881,19 +1079,19 @@ function reset() {
   state = freshState();
   piecesEl.innerHTML = "";
   resultEl.classList.add("hidden");
-  resetStatsDisplay(currentLevel);
+  resetStatsDisplay(currentTemplate);
   render();
 }
 
 function dig(index) {
   if (!state.running || state.dug.has(index) || state.lockedCells.has(index)) return;
-  const level = levels[currentLevel];
+  const template = artifactTemplates[currentTemplate];
   state.dug.add(index);
   state.digs += 1;
-  if (level.buried[index]) {
-    const id = level.buried[index];
+  if (template.buried[index]) {
+    const id = template.buried[index];
     state.found.add(id);
-    addLog(`挖到了${level.pieceDefs.find((p) => p.id === id).label}${level.pieceName}。`);
+    addLog(`挖到了${template.pieceDefs.find((p) => p.id === id).label}${template.pieceName}。`);
     spawnPiece(id);
     tutorial.notifyAction("dig");
   } else {
@@ -905,15 +1103,41 @@ function dig(index) {
 
 function spawnPiece(id) {
   if (document.querySelector(`[data-id="${id}"]`)) return;
-  const level = levels[currentLevel];
-  const def = level.pieceDefs.find((piece) => piece.id === id);
+  const template = artifactTemplates[currentTemplate];
+  const def = template.pieceDefs.find((piece) => piece.id === id);
+  const style = template.piece.style;
   const piece = document.createElement("div");
-  piece.className = `piece ${level.pieceClass}`;
+  piece.className = "piece";
   piece.dataset.id = id;
   piece.dataset.angle = String((def.angle + 90) % 360);
-  piece.textContent = def.label;
+  piece.style.width = `${style.width}px`;
+  piece.style.height = `${style.height}px`;
+  piece.style.background = style.background;
+  piece.style.borderColor = style.borderColor;
+  piece.style.borderWidth = `${style.borderWidth}px`;
+  piece.style.borderStyle = "solid";
+  piece.style.borderRadius = style.borderRadius;
+  piece.style.setProperty("--piece-locked-bg", style.lockedBackground);
   piece.style.left = `${22 + state.found.size * 16}px`;
   piece.style.top = `${26 + state.found.size * 48}px`;
+
+  const innerDeco = document.createElement("div");
+  innerDeco.className = "piece-inner-deco";
+  innerDeco.style.position = "absolute";
+  innerDeco.style.inset = style.innerDecorationInset;
+  innerDeco.style.border = `${style.innerDecorationBorderWidth}px solid ${style.innerDecorationBorderColor}`;
+  innerDeco.style.borderRadius = style.innerDecorationRadius;
+  innerDeco.style.pointerEvents = "none";
+  innerDeco.style.zIndex = "0";
+  piece.insertBefore(innerDeco, piece.firstChild);
+
+  const labelSpan = document.createElement("span");
+  labelSpan.className = "piece-label";
+  labelSpan.textContent = def.label;
+  labelSpan.style.position = "relative";
+  labelSpan.style.zIndex = "1";
+  piece.appendChild(labelSpan);
+
   applyRotation(piece);
   piece.addEventListener("pointerdown", startDrag);
   piece.addEventListener("dblclick", () => rotatePiece(piece));
@@ -960,9 +1184,9 @@ function applyRotation(piece) {
 }
 
 function trySnap(piece) {
-  const level = levels[currentLevel];
+  const template = artifactTemplates[currentTemplate];
   const id = piece.dataset.id;
-  const def = level.pieceDefs.find((item) => item.id === id);
+  const def = template.pieceDefs.find((item) => item.id === id);
   const pieceRect = piece.getBoundingClientRect();
   const targetRect = targetEl.getBoundingClientRect();
   const centerX = pieceRect.left + pieceRect.width / 2;
@@ -971,18 +1195,20 @@ function trySnap(piece) {
   const targetY = targetRect.top + targetRect.height * (def.slot.y + 18) / 100;
   const distance = Math.hypot(centerX - targetX, centerY - targetY);
   const angleOk = Number(piece.dataset.angle) === def.angle;
-  if (distance < 72 && angleOk) {
+  const snapRadius = template.snapRadius;
+  if (distance < snapRadius && angleOk) {
     const benchRect = piecesEl.getBoundingClientRect();
     const targetRelativeX = targetRect.left - benchRect.left + targetRect.width * def.slot.x / 100;
     const targetRelativeY = targetRect.top - benchRect.top + targetRect.height * def.slot.y / 100;
     piece.style.left = `${targetRelativeX}px`;
     piece.style.top = `${targetRelativeY}px`;
     piece.classList.add("locked");
+    piece.style.background = template.piece.style.lockedBackground;
     state.locked.add(id);
-    addLog(`${def.label}${level.pieceName}贴合成功。`);
+    addLog(`${def.label}${template.pieceName}贴合成功。`);
     tutorial.notifyAction("snap");
-    if (state.locked.size === level.pieceDefs.length) {
-      finish(true, `${level.name}修复完成。`);
+    if (state.locked.size === template.pieceDefs.length) {
+      finish(true, `${template.name}修复完成。`);
     }
   } else if (!angleOk) {
     addLog("角度不对，双击碎片可以旋转。");
@@ -994,9 +1220,9 @@ function finish(success, message) {
   if (!state.running && state.timeLeft > 0) return;
   state.running = false;
   clearInterval(timer);
-  const level = levels[currentLevel];
-  const completeness = Math.round((state.locked.size / level.pieceDefs.length) * 100);
-  const scores = calculateFinalScore(level);
+  const template = artifactTemplates[currentTemplate];
+  const completeness = Math.round((state.locked.size / template.pieceDefs.length) * 100);
+  const scores = calculateFinalScore(template);
 
   let eventsHtml = "";
   if (state.keyEvents.length > 0) {
@@ -1024,16 +1250,16 @@ function finish(success, message) {
   `;
 
   resultEl.innerHTML = `<h2>${message}</h2>
-    <p>${success ? "通关" : "结束"}：${level.name}修复任务 · 用时${level.timeLimit - state.timeLeft}秒 · 挖掘${state.digs}次 · 完整度${completeness}%。</p>
+    <p>${success ? "通关" : "结束"}：${template.name}修复任务 · 用时${template.timeLimit - state.timeLeft}秒 · 挖掘${state.digs}次 · 完整度${completeness}%。</p>
     ${eventsHtml}
     ${scoreBreakdown}`;
   resultEl.classList.remove("hidden");
 
   if (success) {
     const record = {
-      levelId: currentLevel,
-      levelName: level.name,
-      timeUsed: level.timeLimit - state.timeLeft,
+      levelId: currentTemplate,
+      levelName: template.name,
+      timeUsed: template.timeLimit - state.timeLeft,
       digs: state.digs,
       completeness: completeness,
       finalScore: scores.finalScore,
@@ -1063,25 +1289,28 @@ function render() {
 }
 
 function renderStats() {
-  const level = levels[currentLevel];
+  const template = artifactTemplates[currentTemplate];
   timeLeftEl.textContent = state.timeLeft;
   digCountEl.textContent = state.digs;
-  progressEl.textContent = `${Math.round((state.locked.size / level.pieceDefs.length) * 100)}%`;
+  progressEl.textContent = `${Math.round((state.locked.size / template.pieceDefs.length) * 100)}%`;
 }
 
 function renderGrid() {
-  const level = levels[currentLevel];
+  const template = artifactTemplates[currentTemplate];
   gridEl.innerHTML = "";
-  for (let i = 0; i < 25; i += 1) {
+  const gridSize = template.gridSize || 25;
+  const cols = Math.sqrt(gridSize);
+  gridEl.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+  for (let i = 0; i < gridSize; i += 1) {
     const cell = document.createElement("button");
     cell.type = "button";
     cell.className = "cell";
     if (state.dug.has(i)) cell.classList.add("dug");
-    if (state.found.has(level.buried[i])) cell.classList.add("found");
+    if (state.found.has(template.buried[i])) cell.classList.add("found");
     if (state.lockedCells.has(i)) cell.classList.add("locked-cell");
     if (state.hintedCells.has(i) && !state.dug.has(i)) cell.classList.add("hinted");
     if (state.dug.has(i)) {
-      cell.textContent = level.buried[i] ? level.pieceName : "土";
+      cell.textContent = template.buried[i] ? template.pieceName : "土";
     } else if (state.lockedCells.has(i)) {
       cell.textContent = "⚠";
     } else if (state.hintedCells.has(i)) {
