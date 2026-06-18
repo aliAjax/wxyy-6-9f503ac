@@ -13,10 +13,13 @@
         <p class="eyebrow">Field Lab Puzzle</p>
         <h1>考古现场拼碎片</h1>
       </div>
-      <div class="stats">
-        <span>时间 <strong id="timeLeft">90</strong></span>
-        <span>挖掘 <strong id="digCount">0</strong></span>
-        <span>完整度 <strong id="progress">0%</strong></span>
+      <div class="header-actions">
+        <button id="archiveBtn" type="button" class="archive-btn">修复档案</button>
+        <div class="stats">
+          <span>时间 <strong id="timeLeft">90</strong></span>
+          <span>挖掘 <strong id="digCount">0</strong></span>
+          <span>完整度 <strong id="progress">0%</strong></span>
+        </div>
       </div>
     </header>
 
@@ -78,6 +81,42 @@
 
     <button id="backBtn" type="button" class="back-btn hidden">← 返回选择任务</button>
   </main>
+
+  <div id="archiveModal" class="modal hidden">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>修复档案</h2>
+        <button id="closeArchiveBtn" type="button" class="close-btn">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="archive-tabs">
+          <button class="tab-btn active" data-tab="recent">最近记录</button>
+          <button class="tab-btn" data-tab="best">最佳成绩</button>
+        </div>
+        <div id="recentTab" class="tab-content active">
+          <div id="recentRecords" class="records-list"></div>
+        </div>
+        <div id="bestTab" class="tab-content">
+          <div id="bestRecords" class="records-list"></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="clearArchiveBtn" type="button" class="clear-btn">清空记录</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="confirmModal" class="modal hidden">
+    <div class="modal-content confirm-modal">
+      <div class="modal-body">
+        <p class="confirm-message">确定要清空所有修复记录吗？此操作无法撤销。</p>
+      </div>
+      <div class="modal-footer">
+        <button id="cancelClearBtn" type="button" class="secondary-btn">取消</button>
+        <button id="confirmClearBtn" type="button" class="danger-btn">确认清空</button>
+      </div>
+    </div>
+  </div>
 
   <script src="app.js"></script>
 </body>
