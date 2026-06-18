@@ -327,7 +327,7 @@ const tutorial = {
     },
     {
       target: "#grid",
-      text: "在探方网格中逐格点击进行挖掘，有的格子藏着碎片，有的只有泥土。试着点击任意一格进行挖掘吧！",
+      text: "在探方网格中逐格点击进行挖掘，有的格子藏着碎片，有的只有泥土。继续挖掘，直到发现第一片陶片吧！",
       arrow: "right",
       action: "dig"
     },
@@ -634,11 +634,11 @@ function dig(index) {
     state.found.add(id);
     addLog(`挖到了${level.pieceDefs.find((p) => p.id === id).label}${level.pieceName}。`);
     spawnPiece(id);
+    tutorial.notifyAction("dig");
   } else {
     addLog("这一格只有松土和碎砂。");
   }
   render();
-  tutorial.notifyAction("dig");
 }
 
 function spawnPiece(id) {
