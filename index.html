@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>考古现场拼碎片</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="shell">
+    <header class="header">
+      <div>
+        <p class="eyebrow">Field Lab Puzzle</p>
+        <h1>考古现场拼碎片</h1>
+      </div>
+      <div class="stats">
+        <span>时间 <strong id="timeLeft">90</strong></span>
+        <span>挖掘 <strong id="digCount">0</strong></span>
+        <span>完整度 <strong id="progress">0%</strong></span>
+      </div>
+    </header>
+
+    <section class="layout">
+      <section class="dig-site">
+        <div class="section-title">
+          <h2>探方</h2>
+          <button id="startBtn" type="button">开始挖掘</button>
+        </div>
+        <div id="grid" class="grid"></div>
+      </section>
+
+      <section class="lab">
+        <div class="section-title">
+          <h2>修复台</h2>
+          <button id="restartBtn" type="button">重来</button>
+        </div>
+        <div class="workbench">
+          <div id="target" class="target">
+            <span class="slot" style="left: 10%; top: 12%; width: 39%; height: 39%;"></span>
+            <span class="slot" style="left: 51%; top: 12%; width: 39%; height: 39%;"></span>
+            <span class="slot" style="left: 10%; top: 53%; width: 39%; height: 35%;"></span>
+            <span class="slot" style="left: 51%; top: 53%; width: 39%; height: 35%;"></span>
+          </div>
+          <div id="pieces" class="pieces"></div>
+        </div>
+      </section>
+
+      <aside class="notes">
+        <h2>现场记录</h2>
+        <div id="log" class="log"></div>
+      </aside>
+    </section>
+
+    <section id="result" class="result hidden"></section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
