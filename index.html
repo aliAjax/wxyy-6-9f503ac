@@ -20,10 +20,37 @@
       </div>
     </header>
 
-    <section class="layout">
+    <section id="levelSelect" class="level-select">
+      <h2>选择修复任务</h2>
+      <div class="level-list">
+        <button class="level-card" data-level="bowl">
+          <div class="level-icon bowl-icon"></div>
+          <div class="level-info">
+            <h3>陶碗修复</h3>
+            <p>4 片碎片 · 90 秒 · 初级</p>
+          </div>
+        </button>
+        <button class="level-card" data-level="tile">
+          <div class="level-icon tile-icon"></div>
+          <div class="level-info">
+            <h3>瓦当修复</h3>
+            <p>6 片碎片 · 120 秒 · 中级</p>
+          </div>
+        </button>
+        <button class="level-card" data-level="mirror">
+          <div class="level-icon mirror-icon"></div>
+          <div class="level-info">
+            <h3>青铜镜修复</h3>
+            <p>9 片碎片 · 180 秒 · 高级</p>
+          </div>
+        </button>
+      </div>
+    </section>
+
+    <section id="gameArea" class="layout hidden">
       <section class="dig-site">
         <div class="section-title">
-          <h2>探方</h2>
+          <h2>探方 · <span id="levelName">陶碗</span></h2>
           <button id="startBtn" type="button">开始挖掘</button>
         </div>
         <div id="grid" class="grid"></div>
@@ -35,11 +62,7 @@
           <button id="restartBtn" type="button">重来</button>
         </div>
         <div class="workbench">
-          <div id="target" class="target">
-            <span class="slot" style="left: 10%; top: 12%; width: 39%; height: 39%;"></span>
-            <span class="slot" style="left: 51%; top: 12%; width: 39%; height: 39%;"></span>
-            <span class="slot" style="left: 10%; top: 53%; width: 39%; height: 35%;"></span>
-            <span class="slot" style="left: 51%; top: 53%; width: 39%; height: 35%;"></span>
+          <div id="target" class="target bowl-target">
           </div>
           <div id="pieces" class="pieces"></div>
         </div>
@@ -52,6 +75,8 @@
     </section>
 
     <section id="result" class="result hidden"></section>
+
+    <button id="backBtn" type="button" class="back-btn hidden">← 返回选择任务</button>
   </main>
 
   <script src="app.js"></script>
