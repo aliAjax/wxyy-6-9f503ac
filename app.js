@@ -1307,6 +1307,7 @@ function init() {
 
 function selectLevel(templateId, skipAutoTutorial = false) {
   currentTemplate = templateId;
+  currentMobileTab = "dig";
   const template = artifactTemplates[templateId];
   levelNameEl.textContent = template.name;
   targetEl.className = "target";
@@ -1314,6 +1315,9 @@ function selectLevel(templateId, skipAutoTutorial = false) {
   levelSelectEl.classList.add("hidden");
   gameAreaEl.classList.remove("hidden");
   backBtn.classList.remove("hidden");
+  if (isMobile) {
+    switchMobileTab(currentMobileTab);
+  }
   state = freshState();
   piecesEl.innerHTML = "";
   resultEl.classList.add("hidden");
@@ -1329,6 +1333,8 @@ function goBack() {
   clearInterval(timer);
   if (tutorial.active) tutorial.skip();
   currentTemplate = null;
+  currentMobileTab = "dig";
+  switchMobileTab(currentMobileTab);
   levelSelectEl.classList.remove("hidden");
   gameAreaEl.classList.add("hidden");
   resultEl.classList.add("hidden");
