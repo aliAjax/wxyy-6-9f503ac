@@ -1422,6 +1422,7 @@ function useTool(toolId) {
     if (result.activateMode) {
       renderTools();
       renderGrid();
+      renderLog();
       return;
     }
   }
