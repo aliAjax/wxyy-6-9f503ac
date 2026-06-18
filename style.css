@@ -501,12 +501,21 @@ h2 {
 }
 
 .record-stats {
+  display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 10px;
 }
 
 .record-stats:has(.record-stat:nth-child(4)) {
   grid-template-columns: repeat(4, 1fr);
+}
+
+.record-stats:has(.record-stat:nth-child(5)) {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.record-stats:has(.record-stat:nth-child(6)) {
+  grid-template-columns: repeat(3, 1fr);
 }
 
 .record-events {
@@ -778,12 +787,6 @@ h2 {
   color: #7d4c21;
 }
 
-.record-stats {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
-}
-
 .record-stat {
   text-align: center;
   padding: 8px;
@@ -859,6 +862,226 @@ h2 {
 
 .danger-btn {
   background: #a83232;
+}
+
+.section-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.hint-btn {
+  background: #7d4c21;
+  position: relative;
+}
+
+.hint-btn:hover {
+  background: #5c3a18;
+}
+
+.hint-btn:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+}
+
+.settlement {
+  margin-top: 20px;
+}
+
+.settlement-rating {
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.rating-label {
+  font-size: 14px;
+  color: rgba(255, 248, 231, .7);
+  margin-bottom: 8px;
+}
+
+.rating-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 90px;
+  height: 90px;
+  border-radius: 50%;
+  font-size: 48px;
+  font-weight: 900;
+  border: 4px solid;
+}
+
+.total-score {
+  margin-top: 12px;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.rating-S .rating-badge {
+  color: #ffd700;
+  border-color: #ffd700;
+  background: rgba(255, 215, 0, .15);
+  box-shadow: 0 0 30px rgba(255, 215, 0, .3);
+}
+
+.rating-A .rating-badge {
+  color: #698980;
+  border-color: #698980;
+  background: rgba(105, 137, 128, .15);
+  box-shadow: 0 0 20px rgba(105, 137, 128, .2);
+}
+
+.rating-B .rating-badge {
+  color: #7ba4d4;
+  border-color: #7ba4d4;
+  background: rgba(123, 164, 212, .15);
+}
+
+.rating-C .rating-badge {
+  color: #d4a067;
+  border-color: #d4a067;
+  background: rgba(212, 160, 103, .15);
+}
+
+.rating-D .rating-badge {
+  color: #d46767;
+  border-color: #d46767;
+  background: rgba(212, 103, 103, .15);
+}
+
+.rating-F .rating-badge {
+  color: #888;
+  border-color: #888;
+  background: rgba(136, 136, 136, .15);
+}
+
+.settlement-scores {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  background: rgba(255, 248, 231, .08);
+  border-radius: 8px;
+  border: 1px solid rgba(255, 248, 231, .15);
+}
+
+.settlement-score-item {
+  display: grid;
+  grid-template-columns: 80px 1fr 36px;
+  gap: 10px;
+  align-items: center;
+}
+
+.score-label {
+  font-size: 14px;
+  color: rgba(255, 248, 231, .8);
+}
+
+.score-bar {
+  height: 12px;
+  background: rgba(255, 248, 231, .12);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.score-bar-fill {
+  height: 100%;
+  border-radius: 6px;
+  background: #c49b62;
+  transition: width .6s cubic-bezier(.4, 0, .2, 1);
+}
+
+.score-value {
+  font-size: 16px;
+  font-weight: 700;
+  color: #c49b62;
+  text-align: right;
+}
+
+.settlement-commentary {
+  margin-top: 20px;
+  padding: 16px 20px;
+  background: rgba(255, 248, 231, .08);
+  border-radius: 8px;
+  border-left: 4px solid #c49b62;
+  font-size: 16px;
+  line-height: 1.6;
+  color: #fff4d9;
+  font-style: italic;
+}
+
+.level-rating {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: 900;
+  color: #fff8e7;
+  z-index: 2;
+}
+
+.level-rating-S {
+  background: #c49b62;
+  box-shadow: 0 0 10px rgba(196, 155, 98, .5);
+}
+
+.level-rating-A {
+  background: #698980;
+}
+
+.level-rating-B {
+  background: #7ba4d4;
+}
+
+.level-rating-C {
+  background: #d4a067;
+}
+
+.level-rating-D {
+  background: #d46767;
+}
+
+.level-icon {
+  position: relative;
+}
+
+.record-rating-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  font-size: 14px;
+  font-weight: 900;
+  color: #fff8e7;
+  margin-left: 8px;
+  vertical-align: middle;
+}
+
+.record-rating-S {
+  background: #c49b62;
+}
+
+.record-rating-A {
+  background: #698980;
+}
+
+.record-rating-B {
+  background: #7ba4d4;
+}
+
+.record-rating-C {
+  background: #d4a067;
+}
+
+.record-rating-D {
+  background: #d46767;
 }
 
 .danger-btn:hover {

@@ -26,9 +26,11 @@ const tutorialOverlay = document.getElementById("tutorialOverlay");
 const tutorialSpotlight = document.getElementById("tutorialSpotlight");
 const tutorialTooltip = document.getElementById("tutorialTooltip");
 const levelListEl = document.querySelector(".level-list");
+const hintBtn = document.getElementById("hintBtn");
 
 const ARCHIVE_STORAGE_KEY = "archaeology_archive_records";
 const TUTORIAL_STORAGE_KEY = "archaeology_tutorial_done";
+const RATING_ORDER = { S: 5, A: 4, B: 3, C: 2, D: 1, F: 0 };
 
 const SITE_EVENTS = {
   collapse: {
@@ -411,20 +413,18 @@ const archive = {
         bestByLevel[record.levelId] = record;
       } else {
         const existing = bestByLevel[record.levelId];
-        const recordScore = record.finalScore !== undefined ? record.finalScore : record.completeness;
-        const existingScore = existing.finalScore !== undefined ? existing.finalScore : existing.completeness;
+        const recordRatingOrder = RATING_ORDER[record.rating] || 0;
+        const existingRatingOrder = RATING_ORDER[existing.rating] || 0;
 
-        if (recordScore > existingScore) {
+        if (recordRatingOrder > existingRatingOrder) {
           bestByLevel[record.levelId] = record;
-        } else if (recordScore === existingScore) {
-          if (record.completeness > existing.completeness) {
+        } else if (recordRatingOrder === existingRatingOrder) {
+          const recordScore = record.finalScore !== undefined ? record.finalScore : record.completeness;
+          const existingScore = existing.finalScore !== undefined ? existing.finalScore : existing.completeness;
+          if (recordScore > existingScore) {
             bestByLevel[record.levelId] = record;
-          } else if (record.completeness === existing.completeness) {
-            if (record.timeUsed < existing.timeUsed) {
-              bestByLevel[record.levelId] = record;
-            } else if (record.timeUsed === existing.timeUsed && record.digs < existing.digs) {
-              bestByLevel[record.levelId] = record;
-            }
+          } else if (recordScore === existingScore && record.timeUsed < existing.timeUsed) {
+            bestByLevel[record.levelId] = record;
           }
         }
       }
@@ -457,6 +457,13 @@ function createRecordCard(record, showBadge = false) {
   const levelSpan = document.createElement("span");
   levelSpan.className = "record-level";
   levelSpan.textContent = record.levelName;
+
+  if (record.rating) {
+    const ratingBadge = document.createElement("span");
+    ratingBadge.className = `record-rating-badge record-rating-${record.rating}`;
+    ratingBadge.textContent = record.rating;
+    levelSpan.appendChild(ratingBadge);
+  }
 
   if (showBadge) {
     const badge = document.createElement("span");
@@ -496,6 +503,20 @@ function createRecordCard(record, showBadge = false) {
     scoreStat.className = "record-stat";
     scoreStat.innerHTML = `<div class="record-stat-label">评分</div><div class="record-stat-value">${record.finalScore}</div>`;
     stats.appendChild(scoreStat);
+  }
+
+  if (record.hintsUsed !== undefined) {
+    const hintStat = document.createElement("div");
+    hintStat.className = "record-stat";
+    hintStat.innerHTML = `<div class="record-stat-label">提示</div><div class="record-stat-value">${record.hintsUsed}次</div>`;
+    stats.appendChild(hintStat);
+  }
+
+  if (record.wrongAngleAttempts !== undefined) {
+    const angleStat = document.createElement("div");
+    angleStat.className = "record-stat";
+    angleStat.innerHTML = `<div class="record-stat-label">角度失误</div><div class="record-stat-value">${record.wrongAngleAttempts}次</div>`;
+    stats.appendChild(angleStat);
   }
 
   card.appendChild(header);
@@ -573,6 +594,7 @@ function clearArchive() {
 
 function renderLevelCards() {
   levelListEl.innerHTML = "";
+  const bestRecords = archive.getBest();
   Object.values(artifactTemplates).forEach((template) => {
     const card = document.createElement("button");
     card.className = "level-card";
@@ -580,6 +602,14 @@ function renderLevelCards() {
 
     const icon = document.createElement("div");
     icon.className = `level-icon ${template.iconClass}`;
+
+    const best = bestRecords.find(r => r.levelId === template.id);
+    if (best && best.rating) {
+      const badge = document.createElement("div");
+      badge.className = `level-rating level-rating-${best.rating}`;
+      badge.textContent = best.rating;
+      icon.appendChild(badge);
+    }
 
     const info = document.createElement("div");
     info.className = "level-info";
@@ -611,7 +641,9 @@ function freshState() {
     bonusScore: 0,
     triggeredEvents: [],
     keyEvents: [],
-    eventCooldowns: {}
+    eventCooldowns: {},
+    wrongAngleAttempts: 0,
+    hintsUsed: 0
   };
 }
 
@@ -755,20 +787,64 @@ function tryTriggerEvent() {
   return null;
 }
 
-function calculateFinalScore(template) {
-  const baseScore = Math.round((state.locked.size / template.pieceDefs.length) * 100);
-  const timeBonus = Math.max(0, state.timeLeft);
-  const digPenalty = Math.max(0, state.digs - template.pieceDefs.length) * 2;
-  const wearPenalty = state.toolWear * 3;
-  const finalScore = Math.max(0, baseScore + state.bonusScore + Math.floor(timeBonus / 5) - digPenalty - wearPenalty);
-  return {
-    baseScore,
-    bonusScore: state.bonusScore,
-    timeBonus: Math.floor(timeBonus / 5),
-    digPenalty,
-    wearPenalty,
-    finalScore
-  };
+function calculateExpertScore(template) {
+  const pieceCount = template.pieceDefs.length;
+  const timeRatio = state.timeLeft / template.timeLimit;
+  const timeScore = Math.round(Math.min(100, timeRatio * 200));
+  const digScore = Math.round(Math.max(0, 100 - Math.max(0, state.digs - pieceCount) * 10));
+  const angleScore = Math.round(Math.max(0, 100 - state.wrongAngleAttempts * 15));
+  const negativeCount = state.triggeredEvents.filter(e => e.type === "negative").length;
+  const positiveCount = state.triggeredEvents.filter(e => e.type === "positive").length;
+  const eventScore = Math.round(Math.max(0, Math.min(100, 60 - negativeCount * 12 + positiveCount * 8)));
+  const hintScore = state.hintsUsed === 0 ? 100 : Math.round(Math.max(0, 100 - state.hintsUsed * 30));
+  const totalScore = Math.round((timeScore + digScore + angleScore + eventScore + hintScore) / 5);
+  return { timeScore, digScore, angleScore, eventScore, hintScore, totalScore };
+}
+
+function getRating(score) {
+  if (score >= 90) return "S";
+  if (score >= 75) return "A";
+  if (score >= 60) return "B";
+  if (score >= 45) return "C";
+  return "D";
+}
+
+function getCommentary(rating, scores) {
+  if (rating === "S") {
+    if (scores.hintScore === 100 && scores.angleScore === 100) return "完美发掘！零提示、零失误，考古界泰斗级的现场操作。";
+    if (scores.hintScore === 100) return "教科书般的修复流程，全程独立判断，堪称楷模。";
+    if (scores.timeScore >= 95) return "电光火石间完成修复，操作之快令人叹为观止！";
+    return "极高水准的修复工作，专业素养令人赞叹。";
+  }
+  if (rating === "A") {
+    if (scores.angleScore === 100) return "手法精准，角度判断无一失误，值得称道。";
+    if (scores.timeScore >= 80) return "节奏把控出色，效率与品质兼备。";
+    if (scores.digScore >= 90) return "挖掘几乎没有多余动作，对地层判断相当准确。";
+    return "专业素养可见，继续保持可臻化境。";
+  }
+  if (rating === "B") {
+    if (scores.digScore < 60) return "挖掘还需更谨慎，减少无效操作可大幅提分。";
+    if (scores.timeScore < 50) return "时间管理有待加强，注意把控作业节奏。";
+    if (scores.eventScore < 60) return "应对现场突发事件还需积累更多经验。";
+    return "中规中矩的修复，基本功扎实但仍有提升空间。";
+  }
+  if (rating === "C") {
+    if (scores.hintScore < 60) return "过度依赖提示，独立判断能力还需锻炼。";
+    if (scores.angleScore < 50) return "角度判断失误较多，修复前多观察可减少偏差。";
+    if (scores.timeScore < 30) return "用时过长，下次可以尝试更高效的发掘策略。";
+    return "勉强完成任务，基本功仍需打磨。";
+  }
+  if (scores.hintScore < 40) return "全程依赖提示完成，建议重新学习操作要领。";
+  if (scores.angleScore < 30) return "碎片角度频繁出错，建议先多观察再动手。";
+  return "修复过程波折较多，需要更多练习来积累经验。";
+}
+
+function getScoreColor(score) {
+  if (score >= 90) return "#ffd700";
+  if (score >= 75) return "#698980";
+  if (score >= 60) return "#7ba4d4";
+  if (score >= 45) return "#d4a067";
+  return "#d46767";
 }
 
 const tutorial = {
@@ -979,6 +1055,7 @@ function init() {
   renderLevelCards();
   startBtn.addEventListener("click", start);
   restartBtn.addEventListener("click", reset);
+  hintBtn.addEventListener("click", useHint);
   backBtn.addEventListener("click", goBack);
   archiveBtn.addEventListener("click", openArchive);
   closeArchiveBtn.addEventListener("click", closeArchive);
@@ -1101,6 +1178,23 @@ function dig(index) {
   render();
 }
 
+function useHint() {
+  if (!state.running) return;
+  const template = artifactTemplates[currentTemplate];
+  const pieceIndices = Object.keys(template.buried).map(Number);
+  const hidden = pieceIndices.filter(i => !state.dug.has(i) && !state.hintedCells.has(i));
+  if (hidden.length === 0) {
+    addLog("没有可提示的碎片了。");
+    return;
+  }
+  const targetIdx = hidden[Math.floor(Math.random() * hidden.length)];
+  state.hintedCells.add(targetIdx);
+  state.hintsUsed += 1;
+  const def = template.pieceDefs.find(p => p.id === template.buried[targetIdx]);
+  addLog(`提示：${def ? def.label : "某件"}${template.pieceName}的位置已标记。`);
+  render();
+}
+
 function spawnPiece(id) {
   if (document.querySelector(`[data-id="${id}"]`)) return;
   const template = artifactTemplates[currentTemplate];
@@ -1210,6 +1304,9 @@ function trySnap(piece) {
     if (state.locked.size === template.pieceDefs.length) {
       finish(true, `${template.name}修复完成。`);
     }
+  } else if (distance < snapRadius && !angleOk) {
+    state.wrongAngleAttempts += 1;
+    addLog("角度不对，双击碎片可以旋转。");
   } else if (!angleOk) {
     addLog("角度不对，双击碎片可以旋转。");
   }
@@ -1217,12 +1314,12 @@ function trySnap(piece) {
 }
 
 function finish(success, message) {
-  if (!state.running && state.timeLeft > 0) return;
+  if (!state.running) return;
   state.running = false;
   clearInterval(timer);
   const template = artifactTemplates[currentTemplate];
   const completeness = Math.round((state.locked.size / template.pieceDefs.length) * 100);
-  const scores = calculateFinalScore(template);
+  const scores = calculateExpertScore(template);
 
   let eventsHtml = "";
   if (state.keyEvents.length > 0) {
@@ -1237,41 +1334,112 @@ function finish(success, message) {
     eventsHtml += `</ul></div>`;
   }
 
-  const scoreBreakdown = `
-    <div class="result-scores">
-      <h3>评分明细</h3>
-      <div class="score-item"><span>完整度</span><span>+${scores.baseScore}</span></div>
-      ${scores.bonusScore > 0 ? `<div class="score-item"><span>遗物奖励</span><span>+${scores.bonusScore}</span></div>` : ""}
-      ${scores.timeBonus > 0 ? `<div class="score-item"><span>时间奖励</span><span>+${scores.timeBonus}</span></div>` : ""}
-      ${scores.digPenalty > 0 ? `<div class="score-item penalty"><span>多余挖掘</span><span>-${scores.digPenalty}</span></div>` : ""}
-      ${scores.wearPenalty > 0 ? `<div class="score-item penalty"><span>工具磨损</span><span>-${scores.wearPenalty}</span></div>` : ""}
-      <div class="score-item total"><span>最终评分</span><span>${scores.finalScore}</span></div>
-    </div>
-  `;
-
-  resultEl.innerHTML = `<h2>${message}</h2>
-    <p>${success ? "通关" : "结束"}：${template.name}修复任务 · 用时${template.timeLimit - state.timeLeft}秒 · 挖掘${state.digs}次 · 完整度${completeness}%。</p>
-    ${eventsHtml}
-    ${scoreBreakdown}`;
-  resultEl.classList.remove("hidden");
-
+  let settlementHtml = "";
   if (success) {
+    const rating = getRating(scores.totalScore);
+    const commentary = getCommentary(rating, scores);
+    const totalColor = getScoreColor(scores.totalScore);
+
+    settlementHtml = `
+      <div class="settlement">
+        <div class="settlement-rating rating-${rating}">
+          <div class="rating-label">专家评级</div>
+          <div class="rating-badge">${rating}</div>
+          <div class="total-score" style="color:${totalColor}">综合评分 ${scores.totalScore}</div>
+        </div>
+        <div class="settlement-scores">
+          <div class="settlement-score-item">
+            <div class="score-label">用时效率</div>
+            <div class="score-bar"><div class="score-bar-fill" style="width:${scores.timeScore}%;background:${getScoreColor(scores.timeScore)}"></div></div>
+            <div class="score-value" style="color:${getScoreColor(scores.timeScore)}">${scores.timeScore}</div>
+          </div>
+          <div class="settlement-score-item">
+            <div class="score-label">挖掘精准</div>
+            <div class="score-bar"><div class="score-bar-fill" style="width:${scores.digScore}%;background:${getScoreColor(scores.digScore)}"></div></div>
+            <div class="score-value" style="color:${getScoreColor(scores.digScore)}">${scores.digScore}</div>
+          </div>
+          <div class="settlement-score-item">
+            <div class="score-label">角度判断</div>
+            <div class="score-bar"><div class="score-bar-fill" style="width:${scores.angleScore}%;background:${getScoreColor(scores.angleScore)}"></div></div>
+            <div class="score-value" style="color:${getScoreColor(scores.angleScore)}">${scores.angleScore}</div>
+          </div>
+          <div class="settlement-score-item">
+            <div class="score-label">事件应对</div>
+            <div class="score-bar"><div class="score-bar-fill" style="width:${scores.eventScore}%;background:${getScoreColor(scores.eventScore)}"></div></div>
+            <div class="score-value" style="color:${getScoreColor(scores.eventScore)}">${scores.eventScore}</div>
+          </div>
+          <div class="settlement-score-item">
+            <div class="score-label">独立完成</div>
+            <div class="score-bar"><div class="score-bar-fill" style="width:${scores.hintScore}%;background:${getScoreColor(scores.hintScore)}"></div></div>
+            <div class="score-value" style="color:${getScoreColor(scores.hintScore)}">${scores.hintScore}</div>
+          </div>
+        </div>
+        <div class="settlement-commentary">${commentary}</div>
+      </div>`;
+
     const record = {
       levelId: currentTemplate,
       levelName: template.name,
       timeUsed: template.timeLimit - state.timeLeft,
       digs: state.digs,
       completeness: completeness,
-      finalScore: scores.finalScore,
+      finalScore: scores.totalScore,
+      rating: rating,
       scores: scores,
       keyEvents: state.keyEvents,
       toolWear: state.toolWear,
       bonusScore: state.bonusScore,
+      hintsUsed: state.hintsUsed,
+      wrongAngleAttempts: state.wrongAngleAttempts,
       completedAt: Date.now()
     };
     archive.addRecord(record);
     addLog("本轮记录已归档。");
+  } else {
+    const totalColor = getScoreColor(scores.totalScore);
+    settlementHtml = `
+      <div class="settlement">
+        <div class="settlement-rating rating-F">
+          <div class="rating-label">专家评级</div>
+          <div class="rating-badge">F</div>
+          <div class="total-score" style="color:${totalColor}">综合评分 ${scores.totalScore}</div>
+        </div>
+        <div class="settlement-scores">
+          <div class="settlement-score-item">
+            <div class="score-label">用时效率</div>
+            <div class="score-bar"><div class="score-bar-fill" style="width:${scores.timeScore}%;background:${getScoreColor(scores.timeScore)}"></div></div>
+            <div class="score-value" style="color:${getScoreColor(scores.timeScore)}">${scores.timeScore}</div>
+          </div>
+          <div class="settlement-score-item">
+            <div class="score-label">挖掘精准</div>
+            <div class="score-bar"><div class="score-bar-fill" style="width:${scores.digScore}%;background:${getScoreColor(scores.digScore)}"></div></div>
+            <div class="score-value" style="color:${getScoreColor(scores.digScore)}">${scores.digScore}</div>
+          </div>
+          <div class="settlement-score-item">
+            <div class="score-label">角度判断</div>
+            <div class="score-bar"><div class="score-bar-fill" style="width:${scores.angleScore}%;background:${getScoreColor(scores.angleScore)}"></div></div>
+            <div class="score-value" style="color:${getScoreColor(scores.angleScore)}">${scores.angleScore}</div>
+          </div>
+          <div class="settlement-score-item">
+            <div class="score-label">事件应对</div>
+            <div class="score-bar"><div class="score-bar-fill" style="width:${scores.eventScore}%;background:${getScoreColor(scores.eventScore)}"></div></div>
+            <div class="score-value" style="color:${getScoreColor(scores.eventScore)}">${scores.eventScore}</div>
+          </div>
+          <div class="settlement-score-item">
+            <div class="score-label">独立完成</div>
+            <div class="score-bar"><div class="score-bar-fill" style="width:${scores.hintScore}%;background:${getScoreColor(scores.hintScore)}"></div></div>
+            <div class="score-value" style="color:${getScoreColor(scores.hintScore)}">${scores.hintScore}</div>
+          </div>
+        </div>
+        <div class="settlement-commentary">修复未能完成，考古现场需更严谨的操作与更充分的准备。</div>
+      </div>`;
   }
+
+  resultEl.innerHTML = `<h2>${message}</h2>
+    <p>${success ? "通关" : "结束"}：${template.name}修复任务 · 用时${template.timeLimit - state.timeLeft}秒 · 挖掘${state.digs}次 · 完整度${completeness}%。</p>
+    ${eventsHtml}
+    ${settlementHtml}`;
+  resultEl.classList.remove("hidden");
 
   render();
 }
@@ -1286,6 +1454,7 @@ function render() {
   renderGrid();
   renderLog();
   startBtn.disabled = state.running;
+  hintBtn.disabled = !state.running;
 }
 
 function renderStats() {
