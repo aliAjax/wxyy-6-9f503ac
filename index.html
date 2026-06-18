@@ -25,8 +25,114 @@
     </header>
 
     <section id="levelSelect" class="level-select">
-      <h2>选择修复任务</h2>
-      <div class="level-list">
+      <div class="level-select-header">
+        <h2>选择修复任务</h2>
+        <div class="level-select-actions">
+          <button id="openEditorBtn" type="button" class="editor-entry-btn">🛠️ 关卡编辑器</button>
+        </div>
+      </div>
+      <div id="presetLevels" class="level-list-section">
+        <h3 class="section-subtitle">官方关卡</h3>
+        <div class="level-list">
+        </div>
+      </div>
+      <div id="customLevelsSection" class="level-list-section hidden">
+        <h3 class="section-subtitle">自定义关卡</h3>
+        <div id="customLevelList" class="level-list">
+        </div>
+      </div>
+    </section>
+
+    <section id="levelEditor" class="level-editor hidden">
+      <div class="editor-header">
+        <h2>🛠️ 关卡编辑器</h2>
+        <div class="editor-header-actions">
+          <button id="editorBackBtn" type="button" class="secondary-btn">← 返回</button>
+        </div>
+      </div>
+
+      <div class="editor-layout">
+        <div class="editor-panel">
+          <h3>基础设置</h3>
+          <div class="form-group">
+            <label for="editorLevelName">关卡名称</label>
+            <input type="text" id="editorLevelName" maxlength="20" placeholder="例如：神秘玉琮">
+          </div>
+          <div class="form-group">
+            <label for="editorDescription">说明文字</label>
+            <textarea id="editorDescription" rows="3" maxlength="200" placeholder="关卡背景说明..."></textarea>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="editorTimeLimit">倒计时（秒）</label>
+              <input type="number" id="editorTimeLimit" min="30" max="600" value="120">
+            </div>
+            <div class="form-group">
+              <label for="editorGridSize">探方尺寸</label>
+              <select id="editorGridSize">
+                <option value="16">4 × 4</option>
+                <option value="25" selected>5 × 5</option>
+                <option value="36">6 × 6</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="editorPieceName">碎片名称</label>
+              <input type="text" id="editorPieceName" maxlength="10" value="碎片">
+            </div>
+            <div class="form-group">
+              <label for="editorSnapRadius">贴合半径</label>
+              <input type="number" id="editorSnapRadius" min="30" max="150" value="60">
+            </div>
+          </div>
+          <div class="form-group">
+            <label>器物外观样式</label>
+            <div class="style-presets">
+              <button type="button" class="style-preset-btn bowl-style active" data-style="bowl" title="陶碗样式">🍯</button>
+              <button type="button" class="style-preset-btn tile-style" data-style="tile" title="瓦当样式">🏺</button>
+              <button type="button" class="style-preset-btn mirror-style" data-style="mirror" title="铜镜样式">🪞</button>
+              <button type="button" class="style-preset-btn jade-style" data-style="jade" title="玉器样式">💎</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="editor-panel">
+          <h3>碎片管理 <span class="piece-count-badge" id="pieceCountBadge">0</span></h3>
+          <div class="editor-piece-actions">
+            <button id="addPieceBtn" type="button" class="editor-btn">+ 添加碎片</button>
+            <button id="clearPiecesBtn" type="button" class="editor-btn danger">清空碎片</button>
+          </div>
+          <div id="pieceListEditor" class="piece-list-editor"></div>
+        </div>
+
+        <div class="editor-panel editor-visual-panel">
+          <h3>探方编辑</h3>
+          <p class="editor-hint" id="digHint">点击探方格放置选中碎片的埋藏位置，再次点击移除。</p>
+          <div id="editorGrid" class="editor-grid"></div>
+        </div>
+
+        <div class="editor-panel editor-visual-panel">
+          <h3>修复台编辑</h3>
+          <p class="editor-hint" id="slotHint">在目标区域内拖动设置碎片槽位，双击槽位可旋转角度。</p>
+          <div class="editor-workbench">
+            <div id="editorTarget" class="editor-target">
+              <div id="editorTargetInner" class="editor-target-inner"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="editor-footer">
+        <div id="validationResult" class="validation-result"></div>
+        <div class="editor-footer-actions">
+          <button id="validateBtn" type="button" class="editor-btn">✓ 校验配置</button>
+          <button id="previewBtn" type="button" class="editor-btn">🎮 预览试玩</button>
+          <button id="saveLevelBtn" type="button" class="editor-btn primary">💾 保存关卡</button>
+          <button id="exportLevelBtn" type="button" class="editor-btn">📤 导出JSON</button>
+          <button id="importLevelBtn" type="button" class="editor-btn">📥 导入JSON</button>
+          <input type="file" id="importFileInput" accept=".json" style="display:none">
+        </div>
       </div>
     </section>
 

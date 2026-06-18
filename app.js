@@ -2205,4 +2205,991 @@ function renderLog() {
   });
 }
 
+const CUSTOM_LEVELS_STORAGE_KEY = "archaeology_custom_levels";
+const STYLE_PRESETS = {
+  bowl: {
+    shape: "circle",
+    targetClass: "",
+    target: {
+      background: "#c28c59",
+      borderColor: "#7a432d",
+      borderWidth: 8,
+      innerRingColor: "#d6a873",
+      innerRingWidth: 12,
+      innerCircleColor: "#7a432d",
+      innerCircleWidth: 6,
+      innerCircleInset: "28%"
+    },
+    piece: {
+      width: 100,
+      height: 100,
+      background: "#cd915c",
+      borderColor: "#7a432d",
+      borderWidth: 4,
+      borderRadius: "18px 8px 22px 10px",
+      lockedBackground: "#d6a873",
+      innerDecorationType: "circle",
+      innerDecorationInset: "20px",
+      innerDecorationBorderWidth: 4,
+      innerDecorationBorderColor: "rgba(99, 54, 36, .75)",
+      innerDecorationRadius: "50%"
+    }
+  },
+  tile: {
+    shape: "tile",
+    targetClass: "tile-shape",
+    target: {
+      background: "#a08465",
+      borderColor: "#4a3728",
+      borderWidth: 8,
+      innerRingColor: "#b89874",
+      innerRingWidth: 12,
+      innerCircleColor: "#4a3728",
+      innerCircleWidth: 6,
+      innerCircleSize: "35%"
+    },
+    piece: {
+      width: 100,
+      height: 100,
+      background: "#a08465",
+      borderColor: "#4a3728",
+      borderWidth: 4,
+      borderRadius: "12px 12px 4px 4px",
+      lockedBackground: "#b89874",
+      innerDecorationType: "rect",
+      innerDecorationInset: "20px",
+      innerDecorationBorderWidth: 4,
+      innerDecorationBorderColor: "rgba(74, 55, 40, .75)",
+      innerDecorationRadius: "4px"
+    }
+  },
+  mirror: {
+    shape: "mirror",
+    targetClass: "mirror-shape",
+    target: {
+      background: "#7a8b94",
+      borderColor: "#2d3e45",
+      borderWidth: 8,
+      innerRingColor: "#95a5ae",
+      innerRingWidth: 12,
+      innerCircleColor: "#2d3e45",
+      innerCircleWidth: 6,
+      innerCircleInset: "20%",
+      innerCircleFill: "#4a5b63",
+      centerKnobColor: "#c49b62",
+      centerKnobBorder: "#7a432d",
+      centerKnobSize: "12%"
+    },
+    piece: {
+      width: 100,
+      height: 100,
+      background: "#7a8b94",
+      borderColor: "#2d3e45",
+      borderWidth: 4,
+      borderRadius: "50%",
+      lockedBackground: "#95a5ae",
+      innerDecorationType: "circle",
+      innerDecorationInset: "22px",
+      innerDecorationBorderWidth: 4,
+      innerDecorationBorderColor: "rgba(45, 62, 69, .75)",
+      innerDecorationRadius: "50%"
+    }
+  },
+  jade: {
+    shape: "circle",
+    targetClass: "jade-shape",
+    target: {
+      background: "#8fbc8f",
+      borderColor: "#3d6b4f",
+      borderWidth: 8,
+      innerRingColor: "#a8d4a8",
+      innerRingWidth: 12,
+      innerCircleColor: "#3d6b4f",
+      innerCircleWidth: 6,
+      innerCircleInset: "25%"
+    },
+    piece: {
+      width: 100,
+      height: 100,
+      background: "#98c998",
+      borderColor: "#3d6b4f",
+      borderWidth: 4,
+      borderRadius: "8px 18px 10px 22px",
+      lockedBackground: "#b8e0b8",
+      innerDecorationType: "circle",
+      innerDecorationInset: "20px",
+      innerDecorationBorderWidth: 4,
+      innerDecorationBorderColor: "rgba(61, 107, 79, .75)",
+      innerDecorationRadius: "50%"
+    }
+  }
+};
+
+const DEFAULT_LABELS = [
+  "顶部", "底部", "左侧", "右侧", "左上", "右上", "左下", "右下",
+  "中心", "顶部左", "顶部右", "底部左", "底部右"
+];
+
+const customLevelsStore = {
+  load() {
+    try {
+      const data = localStorage.getItem(CUSTOM_LEVELS_STORAGE_KEY);
+      return data ? JSON.parse(data) : {};
+    } catch (e) {
+      console.error("加载自定义关卡失败:", e);
+      return {};
+    }
+  },
+  save(levels) {
+    try {
+      localStorage.setItem(CUSTOM_LEVELS_STORAGE_KEY, JSON.stringify(levels));
+    } catch (e) {
+      console.error("保存自定义关卡失败:", e);
+    }
+  },
+  getAll() {
+    const data = this.load();
+    return Object.values(data).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+  },
+  get(id) {
+    const data = this.load();
+    return data[id] || null;
+  },
+  add(level) {
+    const data = this.load();
+    if (!level.id) {
+      level.id = "custom_" + Date.now();
+    }
+    if (!level.createdAt) {
+      level.createdAt = Date.now();
+    }
+    data[level.id] = level;
+    this.save(data);
+    return level;
+  },
+  update(id, level) {
+    const data = this.load();
+    if (data[id]) {
+      level.updatedAt = Date.now();
+      data[id] = { ...data[id], ...level };
+      this.save(data);
+      return true;
+    }
+    return false;
+  },
+  delete(id) {
+    const data = this.load();
+    if (data[id]) {
+      delete data[id];
+      this.save(data);
+      return true;
+    }
+    return false;
+  }
+};
+
+const editor = {
+  state: null,
+  selectedPieceId: null,
+  draggingSlotId: null,
+  dragOffset: { x: 0, y: 0 },
+  editingLevelId: null,
+
+  init() {
+    this.bindUI();
+  },
+
+  bindUI() {
+    document.getElementById("openEditorBtn").addEventListener("click", () => this.open());
+    document.getElementById("editorBackBtn").addEventListener("click", () => this.close());
+    document.getElementById("addPieceBtn").addEventListener("click", () => this.addPiece());
+    document.getElementById("clearPiecesBtn").addEventListener("click", () => this.clearPieces());
+    document.getElementById("validateBtn").addEventListener("click", () => this.validateAndShow());
+    document.getElementById("previewBtn").addEventListener("click", () => this.preview());
+    document.getElementById("saveLevelBtn").addEventListener("click", () => this.save());
+    document.getElementById("exportLevelBtn").addEventListener("click", () => this.exportJSON());
+    document.getElementById("importLevelBtn").addEventListener("click", () => {
+      document.getElementById("importFileInput").click();
+    });
+    document.getElementById("importFileInput").addEventListener("change", (e) => this.importJSON(e));
+
+    document.getElementById("editorLevelName").addEventListener("input", (e) => {
+      if (this.state) this.state.name = e.target.value;
+    });
+    document.getElementById("editorDescription").addEventListener("input", (e) => {
+      if (this.state) this.state.description = e.target.value;
+    });
+    document.getElementById("editorTimeLimit").addEventListener("change", (e) => {
+      if (this.state) this.state.timeLimit = Number(e.target.value);
+    });
+    document.getElementById("editorGridSize").addEventListener("change", (e) => {
+      if (this.state) {
+        const newSize = Number(e.target.value);
+        this.state.gridSize = newSize;
+        Object.keys(this.state.buried).forEach((key) => {
+          if (Number(key) >= newSize) {
+            delete this.state.buried[key];
+          }
+        });
+        this.renderGrid();
+      }
+    });
+    document.getElementById("editorPieceName").addEventListener("input", (e) => {
+      if (this.state) this.state.pieceName = e.target.value;
+    });
+    document.getElementById("editorSnapRadius").addEventListener("change", (e) => {
+      if (this.state) this.state.snapRadius = Number(e.target.value);
+    });
+
+    document.querySelectorAll(".style-preset-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll(".style-preset-btn").forEach((b) => b.classList.remove("active"));
+        btn.classList.add("active");
+        if (this.state) {
+          this.state.stylePreset = btn.dataset.style;
+          this.renderTargetStyle();
+        }
+      });
+    });
+
+    document.getElementById("editorTarget").addEventListener("click", (e) => {
+      if (e.target.id === "editorTarget" || e.target.id === "editorTargetInner") {
+        if (!this.selectedPieceId) {
+          this.showHint("请先在左侧选择一个碎片");
+          return;
+        }
+        const rect = document.getElementById("editorTarget").getBoundingClientRect();
+        const x = ((e.clientX - rect.left) / rect.width) * 100;
+        const y = ((e.clientY - rect.top) / rect.height) * 100;
+        this.setPieceSlot(this.selectedPieceId, x, y);
+      }
+    });
+
+    document.addEventListener("pointermove", (e) => this.handleSlotDragMove(e));
+    document.addEventListener("pointerup", (e) => this.handleSlotDragEnd(e));
+  },
+
+  open(levelId = null) {
+    this.editingLevelId = levelId;
+    if (levelId) {
+      const level = customLevelsStore.get(levelId);
+      if (level) {
+        this.state = JSON.parse(JSON.stringify(level));
+      } else {
+        this.createNewState();
+      }
+    } else {
+      this.createNewState();
+    }
+    this.selectedPieceId = this.state.pieceDefs.length > 0 ? this.state.pieceDefs[0].id : null;
+    this.syncUIFromState();
+    this.renderAll();
+    document.getElementById("levelSelect").classList.add("hidden");
+    document.getElementById("levelEditor").classList.remove("hidden");
+    document.getElementById("validationResult").innerHTML = "";
+  },
+
+  close() {
+    this.editingLevelId = null;
+    document.getElementById("levelEditor").classList.add("hidden");
+    document.getElementById("levelSelect").classList.remove("hidden");
+    renderCustomLevelCards();
+  },
+
+  createNewState() {
+    this.state = {
+      isCustom: true,
+      name: "",
+      description: "",
+      timeLimit: 120,
+      gridSize: 25,
+      pieceName: "碎片",
+      snapRadius: 60,
+      stylePreset: "bowl",
+      difficulty: "自定义",
+      buried: {},
+      pieceDefs: []
+    };
+  },
+
+  syncUIFromState() {
+    document.getElementById("editorLevelName").value = this.state.name || "";
+    document.getElementById("editorDescription").value = this.state.description || "";
+    document.getElementById("editorTimeLimit").value = this.state.timeLimit || 120;
+    document.getElementById("editorGridSize").value = String(this.state.gridSize || 25);
+    document.getElementById("editorPieceName").value = this.state.pieceName || "碎片";
+    document.getElementById("editorSnapRadius").value = this.state.snapRadius || 60;
+    document.querySelectorAll(".style-preset-btn").forEach((btn) => {
+      btn.classList.toggle("active", btn.dataset.style === (this.state.stylePreset || "bowl"));
+    });
+  },
+
+  renderAll() {
+    this.renderPieceList();
+    this.renderGrid();
+    this.renderSlots();
+    this.renderTargetStyle();
+    this.updatePieceCount();
+  },
+
+  updatePieceCount() {
+    document.getElementById("pieceCountBadge").textContent = String(this.state.pieceDefs.length);
+  },
+
+  addPiece() {
+    const idx = this.state.pieceDefs.length;
+    const id = "p" + (idx + 1);
+    const label = DEFAULT_LABELS[idx] || `碎片${idx + 1}`;
+    const cols = Math.sqrt(this.state.gridSize);
+    const gridIdx = idx % this.state.gridSize;
+    const slotX = 10 + (idx % 4) * 20;
+    const slotY = 10 + Math.floor(idx / 4) * 20;
+
+    this.state.pieceDefs.push({
+      id: id,
+      label: label,
+      slot: { x: Math.min(slotX, 70), y: Math.min(slotY, 70) },
+      angle: 0,
+      initialAngle: Math.floor(Math.random() * 8) * 45
+    });
+    this.state.buried[String(gridIdx)] = id;
+    this.selectedPieceId = id;
+    this.renderAll();
+  },
+
+  clearPieces() {
+    if (this.state.pieceDefs.length === 0) return;
+    if (!confirm("确定要清空所有碎片吗？")) return;
+    this.state.pieceDefs = [];
+    this.state.buried = {};
+    this.selectedPieceId = null;
+    this.renderAll();
+  },
+
+  deletePiece(pieceId) {
+    this.state.pieceDefs = this.state.pieceDefs.filter((p) => p.id !== pieceId);
+    Object.keys(this.state.buried).forEach((key) => {
+      if (this.state.buried[key] === pieceId) {
+        delete this.state.buried[key];
+      }
+    });
+    if (this.selectedPieceId === pieceId) {
+      this.selectedPieceId = this.state.pieceDefs.length > 0 ? this.state.pieceDefs[0].id : null;
+    }
+    this.renderAll();
+  },
+
+  selectPiece(pieceId) {
+    this.selectedPieceId = pieceId;
+    this.renderPieceList();
+    this.renderGrid();
+    this.renderSlots();
+  },
+
+  setPieceLabel(pieceId, label) {
+    const piece = this.state.pieceDefs.find((p) => p.id === pieceId);
+    if (piece) piece.label = label;
+  },
+
+  setPieceAngle(pieceId, angle, field) {
+    const piece = this.state.pieceDefs.find((p) => p.id === pieceId);
+    if (piece) {
+      piece[field] = Number(angle);
+      if (field === "angle") this.renderSlots();
+    }
+  },
+
+  setPieceSlot(pieceId, x, y) {
+    const piece = this.state.pieceDefs.find((p) => p.id === pieceId);
+    if (piece) {
+      x = Math.max(8, Math.min(92, x));
+      y = Math.max(8, Math.min(92, y));
+      piece.slot = { x, y };
+      this.renderSlots();
+    }
+  },
+
+  renderPieceList() {
+    const container = document.getElementById("pieceListEditor");
+    container.innerHTML = "";
+    this.state.pieceDefs.forEach((piece, idx) => {
+      const card = document.createElement("div");
+      card.className = "piece-editor-card" + (this.selectedPieceId === piece.id ? " selected" : "");
+
+      const status = this.getPieceStatus(piece);
+
+      card.innerHTML = `
+        <div class="piece-editor-header">
+          <div class="piece-editor-title">
+            <span class="piece-editor-index">${idx + 1}</span>
+            <input type="text" class="piece-editor-label" value="${piece.label}" maxlength="8">
+            <span class="piece-status ${status.type}">${status.text}</span>
+          </div>
+          <button type="button" class="piece-delete-btn" title="删除">✕</button>
+        </div>
+        <div class="piece-editor-body">
+          <div class="mini-field">
+            <label>正确角度 (°)</label>
+            <select class="angle-select" data-field="angle">
+              ${[0, 45, 90, 135, 180, 225, 270, 315].map((a) => 
+                `<option value="${a}" ${piece.angle === a ? "selected" : ""}>${a}°</option>`
+              ).join("")}
+            </select>
+          </div>
+          <div class="mini-field">
+            <label>初始角度 (°)</label>
+            <select class="angle-select" data-field="initialAngle">
+              ${[0, 45, 90, 135, 180, 225, 270, 315].map((a) => 
+                `<option value="${a}" ${piece.initialAngle === a ? "selected" : ""}>${a}°</option>`
+              ).join("")}
+            </select>
+          </div>
+        </div>
+      `;
+
+      const titleDiv = card.querySelector(".piece-editor-title");
+      titleDiv.addEventListener("click", (e) => {
+        if (!e.target.classList.contains("piece-editor-label")) {
+          this.selectPiece(piece.id);
+        }
+      });
+
+      const labelInput = card.querySelector(".piece-editor-label");
+      labelInput.addEventListener("input", (e) => {
+        this.setPieceLabel(piece.id, e.target.value);
+      });
+      labelInput.addEventListener("click", (e) => e.stopPropagation());
+
+      card.querySelector(".piece-delete-btn").addEventListener("click", (e) => {
+        e.stopPropagation();
+        this.deletePiece(piece.id);
+      });
+
+      card.querySelectorAll(".angle-select").forEach((sel) => {
+        sel.addEventListener("change", (e) => {
+          e.stopPropagation();
+          this.setPieceAngle(piece.id, e.target.value, sel.dataset.field);
+        });
+        sel.addEventListener("click", (e) => e.stopPropagation());
+      });
+
+      container.appendChild(card);
+    });
+
+    if (this.state.pieceDefs.length === 0) {
+      container.innerHTML = `<div style="padding:24px;text-align:center;color:#7d4c21;font-size:13px;">
+        还没有碎片，点击「+ 添加碎片」开始创建
+      </div>`;
+    }
+  },
+
+  getPieceStatus(piece) {
+    const hasBuried = Object.values(this.state.buried).includes(piece.id);
+    const hasSlot = piece.slot && piece.slot.x !== undefined && piece.slot.y !== undefined;
+    if (!hasBuried && !hasSlot) return { type: "error", text: "未配置" };
+    if (!hasBuried) return { type: "warn", text: "缺埋藏" };
+    if (!hasSlot) return { type: "warn", text: "缺槽位" };
+    return { type: "ok", text: "已就绪" };
+  },
+
+  renderGrid() {
+    const grid = document.getElementById("editorGrid");
+    grid.innerHTML = "";
+    const size = this.state.gridSize;
+    const cols = Math.sqrt(size);
+    grid.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+
+    for (let i = 0; i < size; i++) {
+      const cell = document.createElement("div");
+      cell.className = "editor-cell";
+      const pieceId = this.state.buried[String(i)];
+      if (pieceId) {
+        cell.classList.add("has-piece");
+        const piece = this.state.pieceDefs.find((p) => p.id === pieceId);
+        const idx = this.state.pieceDefs.findIndex((p) => p.id === pieceId);
+        cell.textContent = String(idx + 1);
+        cell.title = `${piece ? piece.label : pieceId}`;
+        if (pieceId === this.selectedPieceId) {
+          cell.classList.add("selected-piece-cell");
+        }
+      }
+
+      cell.addEventListener("click", () => this.handleGridCellClick(i));
+      grid.appendChild(cell);
+    }
+  },
+
+  handleGridCellClick(cellIdx) {
+    const key = String(cellIdx);
+    if (this.state.buried[key]) {
+      const existingPieceId = this.state.buried[key];
+      this.selectedPieceId = existingPieceId;
+      delete this.state.buried[key];
+    } else {
+      if (!this.selectedPieceId) {
+        this.showHint("请先在左侧选择或添加一个碎片");
+        return;
+      }
+      Object.keys(this.state.buried).forEach((k) => {
+        if (this.state.buried[k] === this.selectedPieceId) {
+          delete this.state.buried[k];
+        }
+      });
+      this.state.buried[key] = this.selectedPieceId;
+    }
+    this.renderGrid();
+    this.renderPieceList();
+  },
+
+  renderTargetStyle() {
+    const preset = STYLE_PRESETS[this.state.stylePreset || "bowl"];
+    const target = document.getElementById("editorTarget");
+    target.className = "editor-target " + (preset.targetClass || "");
+  },
+
+  renderSlots() {
+    const target = document.getElementById("editorTarget");
+    target.querySelectorAll(".editor-slot").forEach((el) => el.remove());
+
+    this.state.pieceDefs.forEach((piece) => {
+      if (!piece.slot || piece.slot.x === undefined) return;
+      const idx = this.state.pieceDefs.findIndex((p) => p.id === piece.id);
+      const slot = document.createElement("div");
+      slot.className = "editor-slot";
+      if (piece.id === this.selectedPieceId) {
+        slot.classList.add("selected-slot");
+      }
+      slot.dataset.pieceId = piece.id;
+      slot.style.left = `${piece.slot.x}%`;
+      slot.style.top = `${piece.slot.y}%`;
+      slot.style.transform = `translate(-50%, -50%) rotate(${piece.angle}deg)`;
+      slot.innerHTML = `
+        <div class="editor-slot-angle-indicator">${piece.angle}°</div>
+        <span>${idx + 1}</span>
+      `;
+      slot.title = `${piece.label} - 双击旋转，拖动调整位置`;
+
+      slot.addEventListener("pointerdown", (e) => {
+        e.stopPropagation();
+        this.startSlotDrag(e, piece.id);
+      });
+
+      slot.addEventListener("dblclick", (e) => {
+        e.stopPropagation();
+        this.rotateSlot(piece.id);
+      });
+
+      slot.addEventListener("click", (e) => {
+        e.stopPropagation();
+        this.selectPiece(piece.id);
+      });
+
+      target.appendChild(slot);
+    });
+  },
+
+  rotateSlot(pieceId) {
+    const piece = this.state.pieceDefs.find((p) => p.id === pieceId);
+    if (piece) {
+      piece.angle = (piece.angle + 45) % 360;
+      this.selectedPieceId = pieceId;
+      this.renderPieceList();
+      this.renderSlots();
+    }
+  },
+
+  startSlotDrag(e, pieceId) {
+    this.draggingSlotId = pieceId;
+    const slot = document.querySelector(`.editor-slot[data-piece-id="${pieceId}"]`);
+    if (slot) slot.classList.add("dragging-slot");
+    const rect = slot.getBoundingClientRect();
+    this.dragOffset = {
+      x: e.clientX - rect.left - rect.width / 2,
+      y: e.clientY - rect.top - rect.height / 2
+    };
+    this.selectPiece(pieceId);
+  },
+
+  handleSlotDragMove(e) {
+    if (!this.draggingSlotId) return;
+    const target = document.getElementById("editorTarget");
+    const targetRect = target.getBoundingClientRect();
+    const x = ((e.clientX - targetRect.left) / targetRect.width) * 100;
+    const y = ((e.clientY - targetRect.top) / targetRect.height) * 100;
+    this.setPieceSlot(this.draggingSlotId, x, y);
+  },
+
+  handleSlotDragEnd() {
+    if (!this.draggingSlotId) return;
+    const slot = document.querySelector(`.editor-slot[data-piece-id="${this.draggingSlotId}"]`);
+    if (slot) slot.classList.remove("dragging-slot");
+    this.draggingSlotId = null;
+  },
+
+  showHint(msg) {
+    const hint = document.getElementById("digHint");
+    const original = hint.textContent;
+    hint.textContent = msg;
+    hint.style.borderLeftColor = "#a83232";
+    setTimeout(() => {
+      hint.textContent = original;
+      hint.style.borderLeftColor = "";
+    }, 2000);
+  },
+
+  validate() {
+    const errors = [];
+    const warnings = [];
+
+    if (!this.state.name || this.state.name.trim().length === 0) {
+      errors.push("关卡名称不能为空");
+    }
+    if (!this.state.timeLimit || this.state.timeLimit < 30) {
+      errors.push("倒计时不能少于 30 秒");
+    }
+    if (this.state.pieceDefs.length === 0) {
+      errors.push("至少需要添加 1 个碎片");
+    }
+    if (this.state.pieceDefs.length > this.state.gridSize) {
+      errors.push(`碎片数量(${this.state.pieceDefs.length})不能超过探方格数(${this.state.gridSize})`);
+    }
+
+    const usedCells = new Set();
+    const usedPieceIds = new Set();
+    this.state.pieceDefs.forEach((piece, idx) => {
+      if (!piece.label || piece.label.trim().length === 0) {
+        errors.push(`第 ${idx + 1} 个碎片的标签不能为空`);
+      }
+      const buriedEntry = Object.entries(this.state.buried).find(([k, v]) => v === piece.id);
+      if (!buriedEntry) {
+        errors.push(`「${piece.label}」还没有设置埋藏位置`);
+      } else {
+        if (usedCells.has(buriedEntry[0])) {
+          errors.push(`多个碎片使用了同一个探方格 ${buriedEntry[0]}`);
+        }
+        usedCells.add(buriedEntry[0]);
+        usedPieceIds.add(piece.id);
+      }
+      if (!piece.slot || piece.slot.x === undefined || piece.slot.y === undefined) {
+        errors.push(`「${piece.label}」还没有设置目标槽位`);
+      }
+    });
+
+    Object.entries(this.state.buried).forEach(([cell, pid]) => {
+      if (!this.state.pieceDefs.find((p) => p.id === pid)) {
+        warnings.push(`探方格 ${cell} 埋藏的碎片 ${pid} 不存在于碎片列表`);
+      }
+    });
+
+    if (this.state.snapRadius < 40) {
+      warnings.push("贴合半径过小，可能导致碎片难以吸附");
+    }
+    if (this.state.timeLimit < this.state.pieceDefs.length * 15) {
+      warnings.push("倒计时可能偏短，建议给更多时间完成修复");
+    }
+
+    const duplicates = {};
+    this.state.pieceDefs.forEach((p) => {
+      const key = `${Math.round(p.slot.x)}_${Math.round(p.slot.y)}`;
+      duplicates[key] = (duplicates[key] || 0) + 1;
+    });
+    Object.entries(duplicates).forEach(([k, v]) => {
+      if (v > 1) {
+        warnings.push(`有 ${v} 个碎片的目标槽位位置重叠，建议调整`);
+      }
+    });
+
+    return { errors, warnings, valid: errors.length === 0 };
+  },
+
+  validateAndShow() {
+    const result = this.validate();
+    const container = document.getElementById("validationResult");
+    if (result.valid) {
+      container.className = "validation-result success";
+      let html = "<strong>✅ 配置校验通过！</strong> 关卡已可以正常游玩。";
+      if (result.warnings.length > 0) {
+        html += `<br><br>💡 优化建议：<ul>`;
+        result.warnings.forEach((w) => html += `<li>${w}</li>`);
+        html += "</ul>";
+      }
+      container.innerHTML = html;
+    } else {
+      container.className = "validation-result error";
+      let html = "<strong>❌ 存在以下问题需要修复：</strong><ul>";
+      result.errors.forEach((e) => html += `<li>${e}</li>`);
+      html += "</ul>";
+      if (result.warnings.length > 0) {
+        html += `<br>💡 优化建议：<ul>`;
+        result.warnings.forEach((w) => html += `<li>${w}</li>`);
+        html += "</ul>";
+      }
+      container.innerHTML = html;
+    }
+    return result;
+  },
+
+  buildTemplate() {
+    const preset = STYLE_PRESETS[this.state.stylePreset || "bowl"];
+    const iconClassMap = {
+      bowl: "bowl-icon",
+      tile: "tile-icon",
+      mirror: "mirror-icon",
+      jade: "custom-icon"
+    };
+
+    return {
+      id: this.state.id || ("custom_" + Date.now()),
+      isCustom: true,
+      name: this.state.name || "自定义关卡",
+      pieceName: this.state.pieceName || "碎片",
+      description: this.state.description || "",
+      timeLimit: this.state.timeLimit || 120,
+      difficulty: "自定义",
+      snapRadius: this.state.snapRadius || 60,
+      gridSize: this.state.gridSize || 25,
+      iconClass: iconClassMap[this.state.stylePreset] || "custom-icon",
+      target: {
+        shape: preset.shape,
+        style: preset.target
+      },
+      piece: {
+        style: preset.piece
+      },
+      buried: JSON.parse(JSON.stringify(this.state.buried)),
+      pieceDefs: JSON.parse(JSON.stringify(this.state.pieceDefs))
+    };
+  },
+
+  preview() {
+    const validation = this.validate();
+    if (!validation.valid) {
+      this.validateAndShow();
+      alert("请先修复配置错误后再预览试玩");
+      return;
+    }
+    const template = this.buildTemplate();
+    const tempId = "__preview__" + Date.now();
+    template.id = tempId;
+    artifactTemplates[tempId] = template;
+    document.getElementById("levelEditor").classList.add("hidden");
+    selectLevel(tempId, true);
+    const origGoBack = window.__origGoBack || goBack;
+    window.__origGoBack = origGoBack;
+    const checkCleanup = setInterval(() => {
+      if (document.getElementById("levelSelect").classList.contains("hidden") === false) {
+        delete artifactTemplates[tempId];
+        clearInterval(checkCleanup);
+        document.getElementById("levelEditor").classList.remove("hidden");
+        document.getElementById("levelSelect").classList.add("hidden");
+      }
+    }, 200);
+  },
+
+  save() {
+    const validation = this.validateAndShow();
+    if (!validation.valid) {
+      alert("请先修复配置错误后再保存");
+      return;
+    }
+    const template = this.buildTemplate();
+    if (this.editingLevelId) {
+      template.id = this.editingLevelId;
+      customLevelsStore.update(this.editingLevelId, template);
+      alert("关卡更新成功！");
+    } else {
+      customLevelsStore.add(template);
+      this.editingLevelId = template.id;
+      alert("关卡保存成功！可以在关卡选择页找到它。");
+    }
+  },
+
+  exportJSON() {
+    const validation = this.validate();
+    if (!validation.valid && !confirm("配置存在错误，确定仍然导出吗？")) return;
+    const template = this.buildTemplate();
+    const json = JSON.stringify(template, null, 2);
+    const blob = new Blob([json], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `level_${(template.name || "custom").replace(/\s+/g, "_")}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  },
+
+  importJSON(e) {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const data = JSON.parse(ev.target.result);
+        if (!data.pieceDefs || !data.buried) {
+          throw new Error("无效的关卡文件格式");
+        }
+        this.state = {
+          isCustom: true,
+          id: data.id,
+          name: data.name || "",
+          description: data.description || "",
+          timeLimit: data.timeLimit || 120,
+          gridSize: data.gridSize || 25,
+          pieceName: data.pieceName || "碎片",
+          snapRadius: data.snapRadius || 60,
+          stylePreset: this.inferStylePreset(data),
+          difficulty: data.difficulty || "自定义",
+          buried: data.buried,
+          pieceDefs: data.pieceDefs
+        };
+        this.syncUIFromState();
+        this.renderAll();
+        alert("关卡导入成功！");
+      } catch (err) {
+        alert("导入失败：" + err.message);
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = "";
+  },
+
+  inferStylePreset(template) {
+    if (template.target && template.target.style) {
+      const bg = template.target.style.background;
+      if (bg === "#c28c59") return "bowl";
+      if (bg === "#a08465") return "tile";
+      if (bg === "#7a8b94") return "mirror";
+      if (bg === "#8fbc8f") return "jade";
+    }
+    if (template.target && template.target.shape === "tile") return "tile";
+    return "bowl";
+  }
+};
+
+function renderCustomLevelCards() {
+  const section = document.getElementById("customLevelsSection");
+  const list = document.getElementById("customLevelList");
+  const levels = customLevelsStore.getAll();
+
+  if (levels.length === 0) {
+    section.classList.add("hidden");
+    return;
+  }
+
+  section.classList.remove("hidden");
+  list.innerHTML = "";
+  const bestRecords = archive.getBest();
+
+  levels.forEach((level) => {
+    const wrapper = document.createElement("div");
+    wrapper.className = "custom-level-card";
+
+    const card = document.createElement("button");
+    card.className = "level-card";
+    card.dataset.level = level.id;
+
+    const icon = document.createElement("div");
+    icon.className = `level-icon ${level.iconClass || "custom-icon"}`;
+
+    const best = bestRecords.find((r) => r.levelId === level.id);
+    if (best && best.rating) {
+      const badge = document.createElement("div");
+      badge.className = `level-rating level-rating-${best.rating}`;
+      badge.textContent = best.rating;
+      icon.appendChild(badge);
+    }
+
+    const tag = document.createElement("span");
+    tag.className = "custom-level-tag";
+    tag.textContent = "自定义";
+    card.appendChild(tag);
+
+    const info = document.createElement("div");
+    info.className = "level-info";
+    info.innerHTML = `
+      <h3>${level.name}修复</h3>
+      <p>${level.pieceDefs.length} 片碎片 · ${level.timeLimit} 秒 · ${level.difficulty || "自定义"}</p>
+    `;
+
+    card.appendChild(icon);
+    card.appendChild(info);
+    card.addEventListener("click", () => {
+      artifactTemplates[level.id] = level;
+      selectLevel(level.id);
+    });
+
+    const actions = document.createElement("div");
+    actions.className = "custom-level-actions";
+    const editBtn = document.createElement("button");
+    editBtn.className = "custom-level-action-btn";
+    editBtn.type = "button";
+    editBtn.title = "编辑";
+    editBtn.textContent = "✏️";
+    editBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      editor.open(level.id);
+    });
+    const delBtn = document.createElement("button");
+    delBtn.className = "custom-level-action-btn delete-btn";
+    delBtn.type = "button";
+    delBtn.title = "删除";
+    delBtn.textContent = "🗑";
+    delBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (confirm(`确定要删除关卡「${level.name}」吗？`)) {
+        customLevelsStore.delete(level.id);
+        renderCustomLevelCards();
+      }
+    });
+
+    actions.appendChild(editBtn);
+    actions.appendChild(delBtn);
+    card.appendChild(actions);
+    wrapper.appendChild(card);
+    list.appendChild(wrapper);
+  });
+}
+
+const _origRenderLevelCards = renderLevelCards;
+renderLevelCards = function () {
+  _origRenderLevelCards();
+  renderCustomLevelCards();
+};
+
+const _origInit = init;
+init = function () {
+  _origInit();
+  editor.init();
+  renderCustomLevelCards();
+};
+
+const _origGoBack = goBack;
+goBack = function () {
+  clearInterval(timer);
+  if (tutorial.active) tutorial.skip();
+
+  if (currentTemplate && currentTemplate.startsWith("__preview__")) {
+    delete artifactTemplates[currentTemplate];
+    currentTemplate = null;
+    currentMobileTab = "dig";
+    switchMobileTab(currentMobileTab);
+    document.getElementById("levelEditor").classList.remove("hidden");
+    document.getElementById("levelSelect").classList.add("hidden");
+    gameAreaEl.classList.add("hidden");
+    resultEl.classList.add("hidden");
+    backBtn.classList.add("hidden");
+    piecesEl.innerHTML = "";
+    resetStatsDisplay();
+    return;
+  }
+
+  if (currentTemplate && customLevelsStore.get(currentTemplate)) {
+    delete artifactTemplates[currentTemplate];
+  }
+  _origGoBack();
+  renderCustomLevelCards();
+};
+
 init();
