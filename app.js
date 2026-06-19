@@ -1817,8 +1817,24 @@ function showLevelPreview(templateId, isDaily = false, isPractice = false) {
     previewGoalsSection.classList.add("hidden");
   }
 
+  const toggleModeBtn = document.getElementById("previewToggleModeBtn");
+  if (toggleModeBtn) {
+    if (isDaily) {
+      toggleModeBtn.classList.remove("hidden");
+      toggleModeBtn.textContent = isPractice
+        ? "🎯 切换为正式挑战（🔒固定工具包）"
+        : "📝 切换为练习模式（自由配置工具包）";
+      toggleModeBtn.onclick = () => {
+        showLevelPreview(templateId, isDaily, !isPractice);
+      };
+    } else {
+      toggleModeBtn.classList.add("hidden");
+      toggleModeBtn.onclick = null;
+    }
+  }
+
   if (isDaily) {
-    previewStartBtn.textContent = isPractice ? "🔄 练习模式" : "🎮 开始挑战";
+    previewStartBtn.textContent = isPractice ? "🔄 开始练习" : "🎮 开始挑战";
   } else {
     previewStartBtn.textContent = "🎮 开始修复";
   }
@@ -1840,7 +1856,7 @@ function startFromPreview() {
   selectedToolkit = currentPreviewToolkit ? { ...currentPreviewToolkit } : null;
 
   if (currentPreviewIsDaily) {
-    startDailyChallenge(currentPreviewDailyPractice);
+    startDailyChallenge(currentPreviewDailyPractice, currentPreviewTemplateId);
   } else {
     selectLevel(currentPreviewTemplateId);
   }
@@ -4304,11 +4320,22 @@ function getTodayChallenge() {
   return challenge;
 }
 
-function startDailyChallenge(practice) {
+function startDailyChallenge(practice, templateId = null) {
   const dateStr = getDateString();
-  const challenge = generateDailyChallenge(dateStr);
+  let challenge;
 
-  artifactTemplates[challenge.id] = challenge;
+  if (templateId && artifactTemplates[templateId] && artifactTemplates[templateId].isDailyChallenge) {
+    challenge = artifactTemplates[templateId];
+  } else {
+    const expectedId = `daily_${dateStr}`;
+    if (artifactTemplates[expectedId] && artifactTemplates[expectedId].isDailyChallenge) {
+      challenge = artifactTemplates[expectedId];
+    } else {
+      challenge = generateDailyChallenge(dateStr);
+      artifactTemplates[challenge.id] = challenge;
+    }
+  }
+
   isDailyChallengeMode = true;
   isPracticeMode = practice;
 

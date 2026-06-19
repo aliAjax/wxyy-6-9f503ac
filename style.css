@@ -2525,6 +2525,30 @@ h2 {
   gap: 10px;
 }
 
+.preview-toggle-mode-btn {
+  width: 100%;
+  padding: 10px 20px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #314c53;
+  background: rgba(196, 155, 98, 0.15);
+  border: 2px dashed rgba(125, 76, 33, 0.4);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.preview-toggle-mode-btn:hover {
+  background: rgba(105, 137, 128, 0.15);
+  border-color: #698980;
+  color: #4a6b62;
+  transform: translateY(-1px);
+}
+
+.preview-toggle-mode-btn.hidden {
+  display: none !important;
+}
+
 .preview-start-btn {
   width: 100%;
   padding: 14px 24px;
