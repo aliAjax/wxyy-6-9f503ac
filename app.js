@@ -412,7 +412,7 @@ const RESTORATION_GOALS = {
     description: (value) => `在 ${value} 秒内完成修复`,
     shortDescription: (value) => `用时≤${value}秒`,
     checkValid: (value) => typeof value === "number" && value > 0,
-    evaluate: (state, template, value) => (template.timeLimit - state.timeLeft) <= value
+    evaluate: (state, template, value) => (state.elapsedTime !== undefined ? state.elapsedTime : (template.timeLimit - state.timeLeft)) <= value
   },
   avoidNegativeKeyEvents: {
     id: "avoidNegativeKeyEvents",
@@ -962,6 +962,7 @@ function freshState() {
   return {
     running: false,
     timeLeft: template.timeLimit,
+    elapsedTime: 0,
     digs: 0,
     dug: new Set(),
     found: new Set(),
@@ -1676,6 +1677,7 @@ function start() {
   addLog(`计时开始，${template.name}进入抢救性发掘。`);
   timer = setInterval(() => {
     state.timeLeft -= 1;
+    state.elapsedTime += 1;
     if (state.timeLeft <= 0) {
       finish(false, `时间到了，${template.name}没能完整修复。`);
     }
@@ -2394,7 +2396,7 @@ function finish(success, message) {
     const record = {
       levelId: currentTemplate,
       levelName: template.name,
-      timeUsed: template.timeLimit - state.timeLeft,
+      timeUsed: state.elapsedTime !== undefined ? state.elapsedTime : (template.timeLimit - state.timeLeft),
       digs: state.digs,
       completeness: completeness,
       finalScore: scores.totalScore,
@@ -2466,7 +2468,7 @@ function finish(success, message) {
   }
 
   resultEl.innerHTML = `<h2>${message}</h2>
-    <p>${success ? "通关" : "结束"}：${template.name}修复任务 · 用时${template.timeLimit - state.timeLeft}秒 · 挖掘${state.digs}次 · 完整度${completeness}%。</p>
+    <p>${success ? "通关" : "结束"}：${template.name}修复任务 · 用时${state.elapsedTime !== undefined ? state.elapsedTime : (template.timeLimit - state.timeLeft)}秒 · 挖掘${state.digs}次 · 完整度${completeness}%。</p>
     ${eventsHtml}
     ${settlementHtml}`;
   resultEl.classList.remove("hidden");
@@ -4174,7 +4176,7 @@ finish = function(success, message) {
         completed: true,
         levelId: template.id,
         levelName: template.name,
-        timeUsed: template.timeLimit - state.timeLeft,
+        timeUsed: state.elapsedTime !== undefined ? state.elapsedTime : (template.timeLimit - state.timeLeft),
         digs: state.digs,
         completeness: completeness,
         finalScore: scores.totalScore,
