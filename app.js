@@ -101,6 +101,801 @@ const TUTORIAL_STORAGE_KEY = "archaeology_tutorial_done";
 const SETTINGS_STORAGE_KEY = "archaeology_game_settings";
 const RATING_ORDER = { S: 5, A: 4, B: 3, C: 2, D: 1, F: 0 };
 
+const SEEDED_RANDOM = {
+  _seed: 1,
+  init(seed) {
+    this._seed = seed || Math.floor(Math.random() * 2147483647);
+    return this._seed;
+  },
+  next() {
+    this._seed = (this._seed * 1664525 + 1013904223) >>> 0;
+    return (this._seed & 0xffffffff) / 0x100000000;
+  },
+  range(min, max) {
+    return min + this.next() * (max - min);
+  },
+  int(min, max) {
+    return Math.floor(this.range(min, max + 1));
+  }
+};
+
+const TIMELINE_EVENT_TYPES = {
+  DIG: "dig",
+  TOOL_USE: "tool",
+  EVENT_TRIGGER: "event",
+  PIECE_SPAWN: "spawn",
+  PIECE_DRAG: "drag",
+  PIECE_ROTATE: "rotate",
+  PIECE_SNAP: "snap",
+  HINT_USE: "hint",
+  GAME_START: "start",
+  GAME_END: "end"
+};
+
+const timelineRecorder = {
+  _events: [],
+  _startTime: 0,
+  _seed: 0,
+  _piecePositions: new Map(),
+
+  start(seed) {
+    this._events = [];
+    this._startTime = Date.now();
+    this._seed = seed;
+    this._piecePositions.clear();
+  },
+
+  _getTimeOffset() {
+    return Date.now() - this._startTime;
+  },
+
+  record(type, data, description) {
+    const event = {
+      type,
+      timestamp: this._getTimeOffset(),
+      index: this._events.length,
+      data: data || {},
+      description: description || ""
+    };
+    this._events.push(event);
+    return event;
+  },
+
+  recordDig(cellIndex, foundPieceId, toolType) {
+    return this.record(TIMELINE_EVENT_TYPES.DIG, {
+      cellIndex,
+      foundPieceId,
+      toolType: toolType || "normal"
+    }, foundPieceId
+      ? `⛏ 挖到了碎片（${toolType || '手挖'}）`
+      : `⛏ 挖掘空槽（${toolType || '手挖'}）`);
+  },
+
+  recordToolUse(toolId, success, message) {
+    return this.record(TIMELINE_EVENT_TYPES.TOOL_USE, {
+      toolId,
+      success
+    }, `${TOOL_NAMES[toolId]?.icon || '🔧'} 使用${TOOL_NAMES[toolId]?.name || toolId}`);
+  },
+
+  recordEventTrigger(eventId, eventName, eventType, message) {
+    return this.record(TIMELINE_EVENT_TYPES.EVENT_TRIGGER, {
+      eventId,
+      eventName,
+      eventType,
+      message
+    }, `${eventType === 'positive' ? '✨' : '⚡'} ${eventName}`);
+  },
+
+  recordPieceSpawn(pieceId, pieceLabel, initialPosition) {
+    this._piecePositions.set(pieceId, initialPosition);
+    return this.record(TIMELINE_EVENT_TYPES.PIECE_SPAWN, {
+      pieceId,
+      pieceLabel,
+      position: initialPosition
+    }, `🧩 发现${pieceLabel}碎片`);
+  },
+
+  recordPieceDrag(pieceId, fromPosition, toPosition) {
+    this._piecePositions.set(pieceId, toPosition);
+    return this.record(TIMELINE_EVENT_TYPES.PIECE_DRAG, {
+      pieceId,
+      fromPosition,
+      toPosition
+    }, `✋ 移动碎片`);
+  },
+
+  recordPieceRotate(pieceId, fromAngle, toAngle) {
+    return this.record(TIMELINE_EVENT_TYPES.PIECE_ROTATE, {
+      pieceId,
+      fromAngle,
+      toAngle
+    }, `🔄 旋转碎片 ${fromAngle}° → ${toAngle}°`);
+  },
+
+  recordPieceSnap(pieceId, pieceLabel, success, position) {
+    if (success) {
+      this._piecePositions.set(pieceId, position);
+    }
+    return this.record(TIMELINE_EVENT_TYPES.PIECE_SNAP, {
+      pieceId,
+      pieceLabel,
+      success,
+      position
+    }, success
+      ? `✅ ${pieceLabel}贴合成功`
+      : `❌ ${pieceLabel}贴合失败`);
+  },
+
+  recordHintUse(cellIndex) {
+    return this.record(TIMELINE_EVENT_TYPES.HINT_USE, {
+      cellIndex
+    }, `💡 使用提示`);
+  },
+
+  recordGameStart() {
+    return this.record(TIMELINE_EVENT_TYPES.GAME_START, {}, "🎮 开始修复");
+  },
+
+  recordGameEnd(success, score, rating) {
+    return this.record(TIMELINE_EVENT_TYPES.GAME_END, {
+      success,
+      score,
+      rating
+    }, success ? "🏆 修复完成" : "⏹ 修复结束");
+  },
+
+  getTimeline() {
+    return {
+      seed: this._seed,
+      startTime: this._startTime,
+      duration: this._getTimeOffset(),
+      events: [...this._events]
+    };
+  },
+
+  hasTimeline() {
+    return this._events.length > 0;
+  }
+};
+
+const playbackManager = {
+  _record: null,
+  _timeline: null,
+  _template: null,
+  _currentStep: -1,
+  _isPlaying: false,
+  _playbackTimer: null,
+  _playbackSpeed: 1,
+  _speedOptions: [0.5, 1, 2, 4],
+  _speedIndex: 1,
+  _playbackState: null,
+
+  init() {
+    this._bindEvents();
+  },
+
+  _bindEvents() {
+    const playbackModal = document.getElementById("playbackModal");
+    if (!playbackModal) return;
+
+    document.getElementById("closePlaybackBtn")?.addEventListener("click", () => this.close());
+    document.getElementById("playbackPrevBtn")?.addEventListener("click", () => this.prevStep());
+    document.getElementById("playbackNextBtn")?.addEventListener("click", () => this.nextStep());
+    document.getElementById("playbackPlayBtn")?.addEventListener("click", () => this.togglePlay());
+    document.getElementById("playbackRestartBtn")?.addEventListener("click", () => this.restart());
+    document.getElementById("playbackSpeedBtn")?.addEventListener("click", () => this.cycleSpeed());
+
+    document.querySelectorAll(".playback-tab-btn").forEach(btn => {
+      btn.addEventListener("click", (e) => {
+        const tab = e.currentTarget.dataset.playbackTab;
+        this._switchTab(tab);
+      });
+    });
+  },
+
+  _switchTab(tabName) {
+    document.querySelectorAll(".playback-tab-btn").forEach(btn => {
+      btn.classList.toggle("active", btn.dataset.playbackTab === tabName);
+    });
+    document.querySelectorAll(".playback-tab-panel").forEach(panel => {
+      panel.classList.toggle("active", panel.id === `playback${tabName.charAt(0).toUpperCase() + tabName.slice(1)}Tab`);
+    });
+  },
+
+  open(record) {
+    this._record = record;
+    this._timeline = record.timeline;
+    this._template = artifactTemplates[record.levelId];
+    this._currentStep = -1;
+    this._isPlaying = false;
+    this._speedIndex = 1;
+    this._playbackSpeed = 1;
+
+    const modal = document.getElementById("playbackModal");
+    const unavailable = document.getElementById("playbackUnavailable");
+    const content = document.getElementById("playbackContent");
+
+    if (!this._timeline || !this._timeline.events || this._timeline.events.length === 0) {
+      unavailable.classList.remove("hidden");
+      content.classList.add("hidden");
+    } else {
+      unavailable.classList.add("hidden");
+      content.classList.remove("hidden");
+      SEEDED_RANDOM.init(this._timeline.seed);
+      this._initPlaybackState();
+      this._renderPlaybackStage();
+      this._renderTimeline();
+      this._updateControls();
+    }
+
+    document.getElementById("playbackLevelName").textContent = record.levelName;
+    document.getElementById("playbackMeta").textContent = formatDateTime(record.completedAt);
+    document.getElementById("playbackSpeedBtn").textContent = `▶ ${this._playbackSpeed}x`;
+
+    modal.classList.remove("hidden");
+  },
+
+  close() {
+    this._stopPlayback();
+    this._record = null;
+    this._timeline = null;
+    this._template = null;
+    this._currentStep = -1;
+    this._playbackState = null;
+    document.getElementById("playbackModal").classList.add("hidden");
+  },
+
+  _initPlaybackState() {
+    const template = this._template;
+    this._playbackState = {
+      dug: new Set(),
+      found: new Set(),
+      locked: new Set(),
+      lockedCells: new Set(),
+      hintedCells: new Set(),
+      digs: 0,
+      timeElapsed: 0,
+      pieces: new Map(),
+      activeTool: null,
+      wrongAngleAttempts: 0,
+      eventCooldowns: {}
+    };
+
+    template.pieceDefs.forEach(def => {
+      this._playbackState.pieces.set(def.id, {
+        id: def.id,
+        label: def.label,
+        angle: 0,
+        spawned: false,
+        locked: false,
+        position: null
+      });
+    });
+  },
+
+  _renderPlaybackStage() {
+    this._renderPlaybackGrid();
+    this._renderPlaybackTools();
+    this._renderPlaybackTarget();
+    this._renderPlaybackPieces();
+  },
+
+  _renderPlaybackGrid() {
+    const gridEl = document.getElementById("playbackGrid");
+    if (!gridEl || !this._template) return;
+
+    const gridSize = this._template.gridSize || 25;
+    const cols = Math.sqrt(gridSize);
+    gridEl.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+    gridEl.innerHTML = "";
+
+    for (let i = 0; i < gridSize; i++) {
+      const cell = document.createElement("div");
+      cell.className = "playback-cell";
+      cell.dataset.index = i;
+      cell.textContent = i + 1;
+      gridEl.appendChild(cell);
+    }
+  },
+
+  _renderPlaybackTools() {
+    const toolsEl = document.getElementById("playbackTools");
+    if (!toolsEl) return;
+
+    toolsEl.innerHTML = "";
+    const tools = ["probe", "brush", "compass", "trowel"];
+    const toolsData = {
+      probe: { name: "探针", icon: "📍" },
+      brush: { name: "刷子", icon: "🖌️" },
+      compass: { name: "罗盘", icon: "🧭" },
+      trowel: { name: "小手铲", icon: "🔧" }
+    };
+
+    tools.forEach(toolId => {
+      const btn = document.createElement("div");
+      btn.className = "playback-tool-btn";
+      btn.dataset.tool = toolId;
+      btn.innerHTML = `
+        <span class="playback-tool-icon">${toolsData[toolId].icon}</span>
+        <span class="playback-tool-name">${toolsData[toolId].name}</span>
+      `;
+      toolsEl.appendChild(btn);
+    });
+  },
+
+  _renderPlaybackTarget() {
+    const targetEl = document.getElementById("playbackTarget");
+    if (!targetEl || !this._template) return;
+
+    const style = this._template.target.style;
+    const shape = this._template.target.shape;
+
+    targetEl.className = "playback-target";
+    if (shape === "tile") targetEl.classList.add("tile-style");
+    else if (shape === "mirror") targetEl.classList.add("mirror-style");
+    else if (shape === "jade") targetEl.classList.add("jade-style");
+
+    targetEl.style.background = style.background;
+    targetEl.style.borderColor = style.borderColor;
+    targetEl.style.borderWidth = `${style.borderWidth}px`;
+    targetEl.style.boxShadow = `inset 0 0 0 ${style.innerRingWidth}px ${style.innerRingColor}`;
+
+    targetEl.innerHTML = "";
+
+    this._template.pieceDefs.forEach(def => {
+      const slot = document.createElement("div");
+      slot.className = "playback-slot";
+      slot.dataset.pieceId = def.id;
+      slot.style.left = `${def.slot.x}%`;
+      slot.style.top = `${def.slot.y}%`;
+      slot.style.transform = `translate(-50%, -50%) rotate(${def.angle}deg)`;
+      slot.style.borderRadius = this._template.piece.style.borderRadius;
+      targetEl.appendChild(slot);
+    });
+  },
+
+  _renderPlaybackPieces() {
+    const piecesEl = document.getElementById("playbackPieces");
+    if (!piecesEl || !this._template) return;
+
+    piecesEl.innerHTML = "";
+  },
+
+  _renderTimeline() {
+    const timelineEl = document.getElementById("playbackTimeline");
+    if (!timelineEl || !this._timeline) return;
+
+    timelineEl.innerHTML = "";
+    this._timeline.events.forEach((event, index) => {
+      const item = document.createElement("div");
+      item.className = `playback-timeline-item ${event.type}`;
+      if (event.type === "event" && event.data.eventType === "positive") {
+        item.classList.add("positive");
+      }
+      item.dataset.index = index;
+
+      const formattedTime = this._formatTime(event.timestamp);
+      item.innerHTML = `
+        <div class="timeline-time">${formattedTime} · 步骤 ${index + 1}</div>
+        <div><span class="timeline-icon"></span>${event.description}</div>
+      `;
+
+      item.addEventListener("click", () => this.goToStep(index));
+      timelineEl.appendChild(item);
+    });
+
+    this._updateStepInfo();
+  },
+
+  _formatTime(ms) {
+    const seconds = Math.floor(ms / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    return `${minutes}:${String(remainingSeconds).padStart(2, '0')}`;
+  },
+
+  _updateStepInfo() {
+    const stepInfo = document.getElementById("playbackStepInfo");
+    if (stepInfo && this._timeline) {
+      const current = this._currentStep + 1;
+      const total = this._timeline.events.length;
+      stepInfo.textContent = `${Math.max(0, current)} / ${total}`;
+    }
+  },
+
+  _updateControls() {
+    const prevBtn = document.getElementById("playbackPrevBtn");
+    const nextBtn = document.getElementById("playbackNextBtn");
+    const playBtn = document.getElementById("playbackPlayBtn");
+
+    if (prevBtn) prevBtn.disabled = this._currentStep < 0;
+    if (nextBtn) nextBtn.disabled = this._currentStep >= this._timeline.events.length - 1;
+
+    if (playBtn) {
+      if (this._isPlaying) {
+        playBtn.textContent = "⏸";
+      } else {
+        playBtn.textContent = this._currentStep >= this._timeline.events.length - 1 ? "↻" : "▶";
+      }
+    }
+
+    this._updateStats();
+    this._updateProgressBar();
+    this._updateTimelineActive();
+    this._clearActiveHighlights();
+  },
+
+  _clearActiveHighlights() {
+    document.querySelectorAll(".playback-cell.active").forEach(el => el.classList.remove("active"));
+    document.querySelectorAll(".playback-piece.active").forEach(el => el.classList.remove("active"));
+    document.querySelectorAll(".playback-slot.active").forEach(el => el.classList.remove("active"));
+    document.querySelectorAll(".playback-tool-btn.active").forEach(el => el.classList.remove("active"));
+  },
+
+  _updateStats() {
+    if (!this._playbackState || !this._template) return;
+
+    const timeEl = document.getElementById("playbackTime");
+    const digsEl = document.getElementById("playbackDigs");
+    const progressEl = document.getElementById("playbackProgress");
+
+    if (timeEl) {
+      const event = this._timeline.events[this._currentStep];
+      const time = event ? event.timestamp : 0;
+      timeEl.textContent = this._formatTime(time);
+    }
+    if (digsEl) digsEl.textContent = this._playbackState.digs;
+    if (progressEl) {
+      const progress = Math.round((this._playbackState.locked.size / this._template.pieceDefs.length) * 100);
+      progressEl.textContent = `${progress}%`;
+    }
+  },
+
+  _updateProgressBar() {
+    const fill = document.getElementById("playbackProgressFill");
+    if (!fill || !this._timeline) return;
+
+    const progress = this._timeline.events.length > 0
+      ? ((this._currentStep + 1) / this._timeline.events.length) * 100
+      : 0;
+    fill.style.width = `${Math.max(0, progress)}%`;
+  },
+
+  _updateTimelineActive() {
+    document.querySelectorAll(".playback-timeline-item").forEach((item, index) => {
+      item.classList.toggle("active", index === this._currentStep);
+      if (index === this._currentStep) {
+        item.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      }
+    });
+  },
+
+  _applyEvent(event, isForward = true) {
+    if (!event || !this._playbackState) return;
+
+    switch (event.type) {
+      case TIMELINE_EVENT_TYPES.DIG:
+        this._applyDigEvent(event, isForward);
+        break;
+      case TIMELINE_EVENT_TYPES.TOOL_USE:
+        this._applyToolUseEvent(event, isForward);
+        break;
+      case TIMELINE_EVENT_TYPES.EVENT_TRIGGER:
+        this._applyEventTriggerEvent(event, isForward);
+        break;
+      case TIMELINE_EVENT_TYPES.PIECE_SPAWN:
+        this._applyPieceSpawnEvent(event, isForward);
+        break;
+      case TIMELINE_EVENT_TYPES.PIECE_DRAG:
+        this._applyPieceDragEvent(event, isForward);
+        break;
+      case TIMELINE_EVENT_TYPES.PIECE_ROTATE:
+        this._applyPieceRotateEvent(event, isForward);
+        break;
+      case TIMELINE_EVENT_TYPES.PIECE_SNAP:
+        this._applyPieceSnapEvent(event, isForward);
+        break;
+      case TIMELINE_EVENT_TYPES.HINT_USE:
+        this._applyHintUseEvent(event, isForward);
+        break;
+      case TIMELINE_EVENT_TYPES.GAME_START:
+      case TIMELINE_EVENT_TYPES.GAME_END:
+        break;
+    }
+  },
+
+  _applyDigEvent(event, isForward) {
+    const { cellIndex, foundPieceId, toolType } = event.data;
+    const cell = document.querySelector(`.playback-cell[data-index="${cellIndex}"]`);
+
+    if (isForward) {
+      this._playbackState.dug.add(cellIndex);
+      this._playbackState.digs++;
+      if (cell) {
+        cell.classList.add("dug");
+        cell.classList.add("active");
+        if (foundPieceId) {
+          cell.classList.add("found");
+        }
+      }
+    } else {
+      this._playbackState.dug.delete(cellIndex);
+      this._playbackState.digs--;
+      if (cell) {
+        cell.classList.remove("dug");
+        cell.classList.remove("found");
+      }
+    }
+  },
+
+  _applyToolUseEvent(event, isForward) {
+    const { toolId } = event.data;
+    const toolBtn = document.querySelector(`.playback-tool-btn[data-tool="${toolId}"]`);
+
+    if (isForward && toolBtn) {
+      document.querySelectorAll(".playback-tool-btn.active").forEach(btn => btn.classList.remove("active"));
+      toolBtn.classList.add("active");
+      this._playbackState.activeTool = toolId;
+    }
+  },
+
+  _applyEventTriggerEvent(event, isForward) {
+    const { eventId, eventType } = event.data;
+    const evt = SITE_EVENTS[eventId];
+    if (!evt) return;
+
+    if (isForward) {
+      const template = this._template;
+      const state = {
+        ...this._playbackState,
+        triggeredEvents: [],
+        keyEvents: []
+      };
+      const result = evt.apply(state, template);
+      if (result && result.success) {
+        this._playbackState.lockedCells = state.lockedCells;
+        this._updateGridCells();
+      }
+    }
+  },
+
+  _applyPieceSpawnEvent(event, isForward) {
+    const { pieceId, pieceLabel, position } = event.data;
+    const piece = this._playbackState.pieces.get(pieceId);
+    if (!piece) return;
+
+    if (isForward) {
+      piece.spawned = true;
+      piece.position = position;
+      this._playbackState.found.add(pieceId);
+      this._renderPieceElement(pieceId, true);
+    } else {
+      piece.spawned = false;
+      piece.position = null;
+      this._playbackState.found.delete(pieceId);
+      this._removePieceElement(pieceId);
+    }
+  },
+
+  _applyPieceDragEvent(event, isForward) {
+    const { pieceId, fromPosition, toPosition } = event.data;
+    const piece = this._playbackState.pieces.get(pieceId);
+    const pieceEl = document.querySelector(`.playback-piece[data-id="${pieceId}"]`);
+    if (!piece || !pieceEl) return;
+
+    const targetPos = isForward ? toPosition : fromPosition;
+    piece.position = targetPos;
+    pieceEl.style.left = `${targetPos.x}px`;
+    pieceEl.style.top = `${targetPos.y}px`;
+    pieceEl.classList.add("active");
+  },
+
+  _applyPieceRotateEvent(event, isForward) {
+    const { pieceId, fromAngle, toAngle } = event.data;
+    const piece = this._playbackState.pieces.get(pieceId);
+    const pieceEl = document.querySelector(`.playback-piece[data-id="${pieceId}"]`);
+    if (!piece || !pieceEl) return;
+
+    const targetAngle = isForward ? toAngle : fromAngle;
+    piece.angle = targetAngle;
+    pieceEl.style.setProperty("--angle", `${targetAngle}deg`);
+    pieceEl.style.transform = `rotate(${targetAngle}deg)`;
+    pieceEl.classList.add("active");
+  },
+
+  _applyPieceSnapEvent(event, isForward) {
+    const { pieceId, pieceLabel, success, position } = event.data;
+    const piece = this._playbackState.pieces.get(pieceId);
+    const pieceEl = document.querySelector(`.playback-piece[data-id="${pieceId}"]`);
+    const slotEl = document.querySelector(`.playback-slot[data-piece-id="${pieceId}"]`);
+    if (!piece) return;
+
+    if (isForward && success) {
+      piece.locked = true;
+      piece.position = position;
+      this._playbackState.locked.add(pieceId);
+      if (pieceEl) {
+        pieceEl.style.left = `${position.x}px`;
+        pieceEl.style.top = `${position.y}px`;
+        pieceEl.classList.add("locked");
+        pieceEl.classList.add("active");
+      }
+      if (slotEl) {
+        slotEl.classList.add("filled");
+        slotEl.classList.add("active");
+      }
+    } else if (!isForward && success) {
+      piece.locked = false;
+      this._playbackState.locked.delete(pieceId);
+      if (pieceEl) {
+        pieceEl.classList.remove("locked");
+      }
+      if (slotEl) {
+        slotEl.classList.remove("filled");
+      }
+    }
+  },
+
+  _applyHintUseEvent(event, isForward) {
+    const { cellIndex } = event.data;
+    const cell = document.querySelector(`.playback-cell[data-index="${cellIndex}"]`);
+
+    if (isForward) {
+      this._playbackState.hintedCells.add(cellIndex);
+      if (cell) cell.classList.add("hinted");
+    } else {
+      this._playbackState.hintedCells.delete(cellIndex);
+      if (cell) cell.classList.remove("hinted");
+    }
+  },
+
+  _updateGridCells() {
+    const cells = document.querySelectorAll(".playback-cell");
+    cells.forEach(cell => {
+      const index = parseInt(cell.dataset.index);
+      cell.classList.toggle("locked-cell", this._playbackState.lockedCells.has(index));
+      cell.classList.toggle("hinted", this._playbackState.hintedCells.has(index));
+    });
+  },
+
+  _renderPieceElement(pieceId, animate = false) {
+    const piecesEl = document.getElementById("playbackPieces");
+    const piece = this._playbackState.pieces.get(pieceId);
+    const def = this._template.pieceDefs.find(p => p.id === pieceId);
+    if (!piecesEl || !piece || !def) return;
+
+    let pieceEl = document.querySelector(`.playback-piece[data-id="${pieceId}"]`);
+    if (!pieceEl) {
+      pieceEl = document.createElement("div");
+      pieceEl.className = "playback-piece";
+      pieceEl.dataset.id = pieceId;
+      pieceEl.textContent = def.label;
+      pieceEl.style.background = this._template.piece.style.background;
+      pieceEl.style.borderRadius = this._template.piece.style.borderRadius;
+      piecesEl.appendChild(pieceEl);
+    }
+
+    if (piece.position) {
+      pieceEl.style.left = `${piece.position.x}px`;
+      pieceEl.style.top = `${piece.position.y}px`;
+    }
+
+    pieceEl.style.setProperty("--angle", `${piece.angle}deg`);
+    pieceEl.style.transform = `rotate(${piece.angle}deg)`;
+
+    if (animate) {
+      pieceEl.classList.add("active");
+      setTimeout(() => pieceEl.classList.remove("active"), 600);
+    }
+  },
+
+  _removePieceElement(pieceId) {
+    const pieceEl = document.querySelector(`.playback-piece[data-id="${pieceId}"]`);
+    if (pieceEl) pieceEl.remove();
+  },
+
+  goToStep(stepIndex) {
+    if (!this._timeline) return;
+
+    if (stepIndex < this._currentStep) {
+      this._initPlaybackState();
+      this._renderPlaybackStage();
+      this._currentStep = -1;
+    }
+
+    while (this._currentStep < stepIndex) {
+      this._currentStep++;
+      const event = this._timeline.events[this._currentStep];
+      this._applyEvent(event, true);
+    }
+
+    this._updateControls();
+  },
+
+  nextStep() {
+    if (!this._timeline || this._currentStep >= this._timeline.events.length - 1) return;
+
+    this._currentStep++;
+    const event = this._timeline.events[this._currentStep];
+    this._applyEvent(event, true);
+    this._updateControls();
+
+    if (this._currentStep >= this._timeline.events.length - 1) {
+      this._stopPlayback();
+    }
+  },
+
+  prevStep() {
+    if (!this._timeline || this._currentStep < 0) return;
+    this.goToStep(this._currentStep - 1);
+  },
+
+  togglePlay() {
+    if (this._currentStep >= this._timeline.events.length - 1) {
+      this.restart();
+      return;
+    }
+
+    if (this._isPlaying) {
+      this._stopPlayback();
+    } else {
+      this._startPlayback();
+    }
+  },
+
+  _startPlayback() {
+    this._isPlaying = true;
+    this._updateControls();
+    this._playbackLoop();
+  },
+
+  _stopPlayback() {
+    this._isPlaying = false;
+    if (this._playbackTimer) {
+      clearTimeout(this._playbackTimer);
+      this._playbackTimer = null;
+    }
+    this._updateControls();
+  },
+
+  _playbackLoop() {
+    if (!this._isPlaying) return;
+
+    if (this._currentStep >= this._timeline.events.length - 1) {
+      this._stopPlayback();
+      return;
+    }
+
+    this.nextStep();
+
+    const nextEvent = this._timeline.events[this._currentStep + 1];
+    const currentEvent = this._timeline.events[this._currentStep];
+    let delay = 800;
+
+    if (nextEvent && currentEvent) {
+      const timeDiff = (nextEvent.timestamp - currentEvent.timestamp) / this._playbackSpeed;
+      delay = Math.max(200, Math.min(2000, timeDiff));
+    }
+
+    this._playbackTimer = setTimeout(() => this._playbackLoop(), delay);
+  },
+
+  restart() {
+    this._stopPlayback();
+    this._currentStep = -1;
+    this._initPlaybackState();
+    this._renderPlaybackStage();
+    this._updateControls();
+  },
+
+  cycleSpeed() {
+    this._speedIndex = (this._speedIndex + 1) % this._speedOptions.length;
+    this._playbackSpeed = this._speedOptions[this._speedIndex];
+    document.getElementById("playbackSpeedBtn").textContent = `▶ ${this._playbackSpeed}x`;
+  }
+};
+
 const gameSettings = {
   _defaults: {
     eventAnim: true,
@@ -1273,6 +2068,34 @@ function createRecordCard(record, showBadge = false) {
     card.appendChild(goalsDiv);
   }
 
+  const hasTimeline = record.timeline && record.timeline.events && Array.isArray(record.timeline.events) && record.timeline.events.length > 0;
+  const actionsDiv = document.createElement("div");
+  actionsDiv.className = "record-actions";
+
+  const playbackBtn = document.createElement("button");
+  playbackBtn.className = "record-playback-btn";
+  playbackBtn.innerHTML = hasTimeline ? '▶ 回放过程' : '🔒 不可回放';
+  playbackBtn.disabled = !hasTimeline;
+  playbackBtn.title = hasTimeline ? '点击回放本局修复过程' : '该档案为旧版记录，不支持回放';
+
+  if (hasTimeline) {
+    playbackBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      playbackManager.open(record);
+    });
+  } else {
+    const noPlaybackHint = document.createElement("div");
+    noPlaybackHint.className = "record-no-playback-hint";
+    noPlaybackHint.textContent = "该档案为旧版记录，暂无过程回放";
+    actionsDiv.appendChild(playbackBtn);
+    actionsDiv.appendChild(noPlaybackHint);
+    card.appendChild(actionsDiv);
+    return card;
+  }
+
+  actionsDiv.appendChild(playbackBtn);
+  card.appendChild(actionsDiv);
+
   return card;
 }
 
@@ -1410,6 +2233,8 @@ function freshState() {
   const toolsInit = { probe: 0, brush: 0, compass: 0, trowel: 0 };
   Object.keys(toolkit).forEach(k => { toolsInit[k] = toolkit[k] || 0; });
   const toolsUsedInit = { probe: 0, brush: 0, compass: 0, trowel: 0 };
+  const randomSeed = SEEDED_RANDOM.init();
+  timelineRecorder.start(randomSeed);
   return {
     running: false,
     timeLeft: template.timeLimit,
@@ -1434,7 +2259,8 @@ function freshState() {
     activeTool: null,
     compassActive: false,
     toolPackage: { ...toolsInit },
-    keyboardMode: false
+    keyboardMode: false,
+    randomSeed: randomSeed
   };
 }
 
@@ -1532,7 +2358,7 @@ function tryTriggerEvent() {
   });
 
   for (const evt of availableEvents) {
-    if (Math.random() < evt.probability) {
+    if (SEEDED_RANDOM.next() < evt.probability) {
       const result = evt.apply(state, template);
       if (result.success) {
         state.triggeredEvents.push({
@@ -1556,6 +2382,8 @@ function tryTriggerEvent() {
           addLog(result.message);
           showEventNotif(evt, result.message);
         }
+
+        timelineRecorder.recordEventTrigger(evt.id, evt.name, evt.type, result.message);
 
         state.eventCooldowns[evt.id] = evt.cooldown;
 
@@ -2069,6 +2897,7 @@ function init() {
 
   updateIsMobile();
   setupMobileTabKeyboard();
+  playbackManager.init();
 
   gameSettings.syncUI();
 
@@ -2376,6 +3205,7 @@ function start() {
   resultEl.classList.add("hidden");
   const template = artifactTemplates[currentTemplate];
   addLog(`计时开始，${template.name}进入抢救性发掘。`);
+  timelineRecorder.recordGameStart();
   timer = setInterval(() => {
     state.timeLeft -= 1;
     state.elapsedTime += 1;
@@ -2424,11 +3254,13 @@ function dig(index) {
     const id = template.buried[index];
     state.found.add(id);
     addLog(`挖到了${template.pieceDefs.find((p) => p.id === id).label}${template.pieceName}。`);
+    timelineRecorder.recordDig(index, id, "normal");
     spawnPiece(id);
     triggerVibration([20, 40, 20]);
     tutorial.notifyAction("dig");
   } else {
     addLog("这一格只有松土和碎砂。");
+    timelineRecorder.recordDig(index, null, "normal");
   }
   tryTriggerEvent();
   render();
@@ -2486,11 +3318,12 @@ function useHint() {
     addLog("没有可提示的碎片了。");
     return;
   }
-  const targetIdx = hidden[Math.floor(Math.random() * hidden.length)];
+  const targetIdx = hidden[Math.floor(SEEDED_RANDOM.next() * hidden.length)];
   state.hintedCells.add(targetIdx);
   state.hintsUsed += 1;
   const def = template.pieceDefs.find(p => p.id === template.buried[targetIdx]);
   addLog(`提示：${def ? def.label : "某件"}${template.pieceName}的位置已标记。`);
+  timelineRecorder.recordHintUse(targetIdx);
   render();
 }
 
@@ -2518,12 +3351,15 @@ function useTool(toolId) {
   const result = tool.use(state, template);
   if (result.success) {
     addLog(result.message);
+    timelineRecorder.recordToolUse(toolId, true, result.message);
     if (result.activateMode) {
       renderTools();
       renderGrid();
       renderLog();
       return;
     }
+  } else {
+    timelineRecorder.recordToolUse(toolId, false, check.reason);
   }
   render();
 }
@@ -2560,10 +3396,12 @@ function brushDig(index) {
     const id = template.buried[index];
     state.found.add(id);
     addLog(`[刷子] 安全清理出${template.pieceDefs.find((p) => p.id === id).label}${template.pieceName}。`);
+    timelineRecorder.recordDig(index, id, "brush");
     spawnPiece(id);
     tutorial.notifyAction("dig");
   } else {
     addLog("[刷子] 安全清理，这一格只有松土和碎砂。");
+    timelineRecorder.recordDig(index, null, "brush");
   }
 
   render();
@@ -2582,11 +3420,13 @@ function trowelDig(index) {
     const id = template.buried[index];
     state.found.add(id);
     addLog(`[小手铲] 精确挖掘出${template.pieceDefs.find((p) => p.id === id).label}${template.pieceName}！`);
+    timelineRecorder.recordDig(index, id, "trowel");
     spawnPiece(id);
     tutorial.notifyAction("dig");
   } else {
     addLog("[小手铲] 精确挖掘落空，这一格只有松土，返还1次刷子。");
     state.tools.brush = (state.tools.brush || 0) + 1;
+    timelineRecorder.recordDig(index, null, "trowel");
   }
 
   render();
@@ -2699,6 +3539,11 @@ function spawnPiece(id) {
     top: piece.style.top
   });
 
+  timelineRecorder.recordPieceSpawn(id, def.label, {
+    left: piece.style.left,
+    top: piece.style.top
+  });
+
   if (isMobile && state.found.size === 1) {
     pulseMobileTab("repair");
   }
@@ -2713,6 +3558,10 @@ function movePieceWithKeyboard(piece, direction) {
 
   let left = parseFloat(piece.style.left) || 0;
   let top = parseFloat(piece.style.top) || 0;
+  const fromPosition = {
+    left: `${left}px`,
+    top: `${top}px`
+  };
 
   switch (direction) {
     case "ArrowLeft":
@@ -2729,8 +3578,19 @@ function movePieceWithKeyboard(piece, direction) {
       break;
   }
 
+  const toPosition = {
+    left: `${left}px`,
+    top: `${top}px`
+  };
+
   piece.style.left = `${left}px`;
   piece.style.top = `${top}px`;
+
+  const pieceId = piece.dataset.id;
+  if (pieceId && (fromPosition.left !== toPosition.left || fromPosition.top !== toPosition.top)) {
+    timelineRecorder.recordPieceDrag(pieceId, fromPosition, toPosition);
+  }
+
   selectPiece(piece);
   updateSnapFeedback(piece);
   piece.setAttribute("aria-label", `${piece.dataset.label || '碎片'}，位置(${Math.round(left)}, ${Math.round(top)})，角度${piece.dataset.angle}度，按方向键移动，R键旋转，空格键尝试贴合`);
@@ -2853,7 +3713,11 @@ function startDrag(event) {
     piece,
     offsetX,
     offsetY,
-    isTouch
+    isTouch,
+    fromPosition: {
+      left: piece.style.left,
+      top: piece.style.top
+    }
   };
 
   piece.classList.add("dragging");
@@ -2891,6 +3755,19 @@ function endDrag(event) {
   piece.removeEventListener("pointermove", dragMove);
   piece.removeEventListener("pointercancel", endDrag);
   piece.classList.remove("dragging");
+
+  const pieceId = piece.dataset.id;
+  const fromPosition = dragging ? dragging.fromPosition : null;
+  const toPosition = {
+    left: piece.style.left,
+    top: piece.style.top
+  };
+
+  if (fromPosition && pieceId &&
+      (fromPosition.left !== toPosition.left || fromPosition.top !== toPosition.top)) {
+    timelineRecorder.recordPieceDrag(pieceId, fromPosition, toPosition);
+  }
+
   dragging = null;
   hideCompass();
   clearSnapFeedback();
@@ -2911,12 +3788,19 @@ function preventPageScroll(prevent) {
 
 function rotatePiece(piece) {
   if (!state.running || piece.classList.contains("locked")) return;
-  piece.dataset.angle = String((Number(piece.dataset.angle) + 45) % 360);
+  const pieceId = piece.dataset.id;
+  const fromAngle = Number(piece.dataset.angle);
+  piece.dataset.angle = String((fromAngle + 45) % 360);
+  const toAngle = Number(piece.dataset.angle);
   applyRotation(piece);
   tutorial.notifyAction("rotate");
   selectPiece(piece);
   updateSnapFeedback(piece);
   piece.setAttribute("aria-label", `${piece.dataset.label || '碎片'}，当前角度${piece.dataset.angle}度，按方向键移动，R键旋转，空格键尝试贴合`);
+
+  if (pieceId) {
+    timelineRecorder.recordPieceRotate(pieceId, fromAngle, toAngle);
+  }
 }
 
 function selectPiece(piece) {
@@ -3198,6 +4082,13 @@ function trySnap(piece) {
     piece.setAttribute("aria-live", "polite");
     piece.setAttribute("aria-label", `${def.label}贴合成功`);
 
+    const snapPosition = {
+      left: `${targetRelativeX}px`,
+      top: `${targetRelativeY}px`
+    };
+
+    timelineRecorder.recordPieceSnap(id, def.label, true, snapPosition);
+
     setTimeout(() => {
       piece.classList.remove("snapping");
       piece.classList.add("locked");
@@ -3237,6 +4128,10 @@ function trySnap(piece) {
     piece.classList.add("shake");
     piece.setAttribute("aria-live", "assertive");
     piece.setAttribute("aria-label", `${def.label}角度不对，当前${piece.dataset.angle}度，目标${def.angle}度`);
+    timelineRecorder.recordPieceSnap(id, def.label, false, {
+      left: piece.style.left,
+      top: piece.style.top
+    });
     setTimeout(() => piece.classList.remove("shake"), 400);
     clearSnapFeedback();
     updateSnapFeedback(piece);
@@ -3245,6 +4140,10 @@ function trySnap(piece) {
     piece.classList.add("shake");
     piece.setAttribute("aria-live", "assertive");
     piece.setAttribute("aria-label", `${def.label}位置不对且角度不对，当前${piece.dataset.angle}度，目标${def.angle}度`);
+    timelineRecorder.recordPieceSnap(id, def.label, false, {
+      left: piece.style.left,
+      top: piece.style.top
+    });
     setTimeout(() => piece.classList.remove("shake"), 400);
     clearSnapFeedback();
     updateSnapFeedback(piece);
@@ -3253,6 +4152,10 @@ function trySnap(piece) {
     piece.classList.add("shake");
     piece.setAttribute("aria-live", "assertive");
     piece.setAttribute("aria-label", `${def.label}位置不对，请移到目标轮廓附近`);
+    timelineRecorder.recordPieceSnap(id, def.label, false, {
+      left: piece.style.left,
+      top: piece.style.top
+    });
     setTimeout(() => piece.classList.remove("shake"), 400);
     clearSnapFeedback();
     updateSnapFeedback(piece);
@@ -3268,6 +4171,8 @@ function finish(success, message) {
   const template = artifactTemplates[currentTemplate];
   const completeness = Math.round((state.locked.size / template.pieceDefs.length) * 100);
   const scores = calculateExpertScore(template);
+  const rating = success ? getRating(scores.totalScore) : "F";
+  timelineRecorder.recordGameEnd(success, scores.totalScore, rating);
 
   let eventsHtml = "";
   if (state.keyEvents.length > 0) {
@@ -3382,7 +4287,9 @@ function finish(success, message) {
       goals: goalResults,
       goalsAchieved: achievedGoalsCount,
       goalsTotal: goalsCount,
-      completedAt: Date.now()
+      completedAt: Date.now(),
+      randomSeed: state.randomSeed,
+      timeline: timelineRecorder.getTimeline()
     };
     archive.addRecord(record);
     addLog("本轮记录已归档。");
@@ -3437,6 +4344,32 @@ function finish(success, message) {
         </div>
         <div class="settlement-commentary">修复未能完成，考古现场需更严谨的操作与更充分的准备。</div>
       </div>`;
+
+    const record = {
+      levelId: currentTemplate,
+      levelName: template.name,
+      timeUsed: state.elapsedTime !== undefined ? state.elapsedTime : (template.timeLimit - state.timeLeft),
+      digs: state.digs,
+      completeness: completeness,
+      finalScore: scores.totalScore,
+      rating: "F",
+      scores: scores,
+      keyEvents: state.keyEvents,
+      toolWear: state.toolWear,
+      bonusScore: state.bonusScore,
+      hintsUsed: state.hintsUsed,
+      wrongAngleAttempts: state.wrongAngleAttempts,
+      toolsUsed: { ...state.toolsUsed },
+      toolPackage: state.toolPackage ? { ...state.toolPackage } : null,
+      goals: goalResults,
+      goalsAchieved: achievedGoalsCount,
+      goalsTotal: goalsCount,
+      completedAt: Date.now(),
+      randomSeed: state.randomSeed,
+      timeline: timelineRecorder.getTimeline()
+    };
+    archive.addRecord(record);
+    addLog("本轮记录已归档。");
   }
 
   resultEl.innerHTML = `<h2>${message}</h2>

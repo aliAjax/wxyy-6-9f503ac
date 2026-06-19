@@ -402,6 +402,79 @@
 
   <div id="eventNotifContainer" class="event-notif-container"></div>
 
+  <div id="playbackModal" class="modal hidden">
+    <div class="modal-content playback-modal-content">
+      <div class="modal-header playback-header">
+        <div class="playback-title">
+          <h2 id="playbackLevelName">修复过程回放</h2>
+          <span id="playbackMeta" class="playback-meta"></span>
+        </div>
+        <div class="playback-header-actions">
+          <button id="playbackSpeedBtn" type="button" class="playback-speed-btn">▶ 1x</button>
+          <button id="closePlaybackBtn" type="button" class="close-btn">&times;</button>
+        </div>
+      </div>
+      <div class="modal-body playback-body">
+        <div id="playbackUnavailable" class="playback-unavailable hidden">
+          <div class="playback-unavailable-icon">📜</div>
+          <div class="playback-unavailable-title">此档案暂无回放数据</div>
+          <div class="playback-unavailable-desc">该记录创建于回放功能上线之前，无法进行过程回放。</div>
+          <div class="playback-unavailable-hint">完成新的修复任务后即可生成可回放的时间线记录。</div>
+        </div>
+        <div id="playbackContent" class="playback-content">
+          <div class="playback-stage">
+            <div class="playback-tabs">
+              <button class="playback-tab-btn active" data-playback-tab="dig">⛏️ 探方</button>
+              <button class="playback-tab-btn" data-playback-tab="repair">🔧 修复台</button>
+            </div>
+            <div id="playbackDigTab" class="playback-tab-panel active">
+              <div id="playbackGrid" class="playback-grid"></div>
+              <div id="playbackTools" class="playback-tools-panel"></div>
+            </div>
+            <div id="playbackRepairTab" class="playback-tab-panel">
+              <div class="playback-workbench">
+                <div id="playbackTarget" class="playback-target"></div>
+                <div id="playbackPieces" class="playback-pieces"></div>
+              </div>
+            </div>
+          </div>
+          <div class="playback-sidebar">
+            <div class="playback-stats">
+              <div class="playback-stat">
+                <span class="playback-stat-label">⏱ 时间</span>
+                <span class="playback-stat-value" id="playbackTime">0s</span>
+              </div>
+              <div class="playback-stat">
+                <span class="playback-stat-label">⛏ 挖掘</span>
+                <span class="playback-stat-value" id="playbackDigs">0</span>
+              </div>
+              <div class="playback-stat">
+                <span class="playback-stat-label">🧩 完成</span>
+                <span class="playback-stat-value" id="playbackProgress">0%</span>
+              </div>
+            </div>
+            <div class="playback-timeline-container">
+              <div class="playback-timeline-header">
+                <span>📋 操作时间线</span>
+                <span id="playbackStepInfo" class="playback-step-info">0 / 0</span>
+              </div>
+              <div id="playbackTimeline" class="playback-timeline"></div>
+            </div>
+            <div class="playback-controls">
+              <button id="playbackPrevBtn" type="button" class="playback-control-btn" title="上一步">⏮</button>
+              <button id="playbackPlayBtn" type="button" class="playback-control-btn playback-play-btn" title="播放/暂停">▶</button>
+              <button id="playbackNextBtn" type="button" class="playback-control-btn" title="下一步">⏭</button>
+              <button id="playbackRestartBtn" type="button" class="playback-control-btn" title="重新开始">↻</button>
+            </div>
+            <div class="playback-progress-bar">
+              <div id="playbackProgressFill" class="playback-progress-fill"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script src="app.js"></script>
 </body>
 </html>
