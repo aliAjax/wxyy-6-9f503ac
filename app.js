@@ -3994,7 +3994,9 @@ const editor = {
 
     if (data.buried) {
       const validPieceIds = new Set(data.pieceDefs ? data.pieceDefs.map((p) => p.id) : []);
+      const validBurials = [];
       const burialCounts = {};
+      const pieceBurialCounts = {};
       const sizeChanged = originalGridSize !== gridSize;
 
       Object.entries(data.buried).forEach(([cell, pid]) => {
@@ -4012,6 +4014,9 @@ const editor = {
         }
         if (!burialCounts[cell]) burialCounts[cell] = [];
         burialCounts[cell].push(pid);
+        if (!pieceBurialCounts[pid]) pieceBurialCounts[pid] = [];
+        pieceBurialCounts[pid].push(cell);
+        validBurials.push([cell, pid]);
       });
 
       Object.entries(burialCounts).forEach(([cell, pids]) => {
@@ -4024,11 +4029,25 @@ const editor = {
         }
       });
 
+      Object.entries(pieceBurialCounts).forEach(([pid, cells]) => {
+        if (cells.length > 1) {
+          const piece = data.pieceDefs.find((p) => p.id === pid);
+          const label = piece ? piece.label : pid;
+          issues.push(`碎片「${label}」在 ${cells.length} 个探方格重复埋藏（${cells.join("、")}），仅保留位置 ${cells[cells.length - 1]}`);
+        }
+      });
+
+      const lastCellByPieceId = {};
+      validBurials.forEach(([cell, pid]) => {
+        lastCellByPieceId[pid] = cell;
+      });
+
       const cleanedBuried = {};
-      Object.entries(data.buried).forEach(([cell, pid]) => {
+      validBurials.forEach(([cell, pid]) => {
         const cellNum = Number(cell);
         if (cellNum < 0 || cellNum >= gridSize) return;
         if (!validPieceIds.has(pid)) return;
+        if (lastCellByPieceId[pid] !== cell) return;
         cleanedBuried[cell] = pid;
       });
       data.buried = cleanedBuried;
