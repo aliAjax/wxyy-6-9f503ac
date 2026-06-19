@@ -3200,4 +3200,631 @@ goBack = function () {
   renderCustomLevelCards();
 };
 
+const DAILY_CHALLENGE_STORAGE_KEY = "archaeology_daily_challenge";
+const DAILY_PRACTICE_KEY = "archaeology_daily_practice";
+
+function seededRandom(seed) {
+  let hash = 0;
+  const seedStr = String(seed);
+  for (let i = 0; i < seedStr.length; i++) {
+    const char = seedStr.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash;
+  }
+  let state = Math.abs(hash) || 1;
+  return function() {
+    state = (state * 1664525 + 1013904223) >>> 0;
+    return state / 4294967296;
+  };
+}
+
+function getDateString(date) {
+  const d = date || new Date();
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function createShuffledArray(rng, length) {
+  const arr = [];
+  for (let i = 0; i < length; i++) arr.push(i);
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+function generateDailyChallenge(dateStr) {
+  const seed = `wxyy_daily_${dateStr}`;
+  const rng = seededRandom(seed);
+
+  const templateIds = Object.keys(artifactTemplates).filter(id => id !== "jade");
+  const baseTemplates = templateIds.map(id => artifactTemplates[id]);
+
+  const difficultyIdx = Math.floor(rng() * baseTemplates.length);
+  const baseTemplate = baseTemplates[difficultyIdx];
+
+  const gridSize = baseTemplate.gridSize;
+  const cols = Math.sqrt(gridSize);
+
+  const pieceCount = baseTemplate.pieceDefs.length;
+  const shuffledPositions = createShuffledArray(rng, gridSize);
+  const buriedPositions = shuffledPositions.slice(0, pieceCount);
+
+  const buried = {};
+  const pieceDefs = [];
+  for (let i = 0; i < pieceCount; i++) {
+    const pieceId = `dp${i}`;
+    buried[buriedPositions[i]] = pieceId;
+
+    const baseDef = baseTemplate.pieceDefs[i];
+    const angleOffset = Math.floor(rng() * 8) * 45;
+
+    const xMin = 5;
+    const xMax = 65;
+    const yMin = 5;
+    const yMax = 75;
+    const slotX = xMin + rng() * (xMax - xMin);
+    const slotY = yMin + rng() * (yMax - yMin);
+    const slotAngle = Math.floor(rng() * 8) * 45;
+
+    pieceDefs.push({
+      id: pieceId,
+      label: baseDef.label,
+      slot: { x: slotX, y: slotY },
+      angle: slotAngle,
+      initialAngle: (slotAngle + angleOffset + 180) % 360
+    });
+  }
+
+  const eventModifiers = {};
+  Object.keys(SITE_EVENTS).forEach(eventId => {
+    const baseProb = SITE_EVENTS[eventId].probability;
+    const modifier = 0.7 + rng() * 0.6;
+    eventModifiers[eventId] = Math.min(0.35, Math.max(0.02, baseProb * modifier));
+  });
+
+  const toolCounts = {
+    probe: Math.max(1, TOOLS.probe.baseCount + Math.floor(rng() * 3) - 1),
+    brush: Math.max(1, TOOLS.brush.baseCount + Math.floor(rng() * 3) - 1),
+    compass: Math.max(0, TOOLS.compass.baseCount + Math.floor(rng() * 2) - 1)
+  };
+
+  const timeModifier = 0.85 + rng() * 0.3;
+  const timeLimit = Math.round(baseTemplate.timeLimit * timeModifier);
+
+  const targetScore = Math.round(50 + rng() * 35);
+  const targetRating = getRating(targetScore);
+
+  const challengeTemplate = {
+    id: `daily_${dateStr}`,
+    name: `每日挑战 · ${baseTemplate.name}`,
+    pieceName: baseTemplate.pieceName,
+    timeLimit: timeLimit,
+    difficulty: "每日挑战",
+    snapRadius: baseTemplate.snapRadius,
+    gridSize: gridSize,
+    iconClass: baseTemplate.iconClass,
+    target: JSON.parse(JSON.stringify(baseTemplate.target)),
+    piece: JSON.parse(JSON.stringify(baseTemplate.piece)),
+    buried: buried,
+    pieceDefs: pieceDefs,
+    isDailyChallenge: true,
+    date: dateStr,
+    eventModifiers: eventModifiers,
+    toolCounts: toolCounts,
+    targetScore: targetScore,
+    targetRating: targetRating
+  };
+
+  return challengeTemplate;
+}
+
+const dailyChallengeStore = {
+  load() {
+    try {
+      const data = localStorage.getItem(DAILY_CHALLENGE_STORAGE_KEY);
+      return data ? JSON.parse(data) : {};
+    } catch (e) {
+      console.error("加载每日挑战记录失败:", e);
+      return {};
+    }
+  },
+
+  save(records) {
+    try {
+      localStorage.setItem(DAILY_CHALLENGE_STORAGE_KEY, JSON.stringify(records));
+    } catch (e) {
+      console.error("保存每日挑战记录失败:", e);
+    }
+  },
+
+  getRecord(dateStr) {
+    const records = this.load();
+    return records[dateStr] || null;
+  },
+
+  setRecord(dateStr, record) {
+    const records = this.load();
+    records[dateStr] = record;
+    this.save(records);
+  },
+
+  hasCompleted(dateStr) {
+    const record = this.getRecord(dateStr);
+    return record && record.completed;
+  },
+
+  getStreak() {
+    const records = this.load();
+    let streak = 0;
+    const today = new Date();
+
+    for (let i = 0; i < 365; i++) {
+      const d = new Date(today);
+      d.setDate(d.getDate() - i);
+      const dateStr = getDateString(d);
+      if (records[dateStr] && records[dateStr].completed) {
+        streak++;
+      } else if (i === 0) {
+        continue;
+      } else {
+        break;
+      }
+    }
+    return streak;
+  },
+
+  getCalendarData(year, month) {
+    const records = this.load();
+    const calendar = [];
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    const startDay = firstDay.getDay();
+
+    for (let i = 0; i < startDay; i++) {
+      calendar.push({ date: null, weekday: i });
+    }
+
+    for (let day = 1; day <= lastDay.getDate(); day++) {
+      const dateStr = getDateString(new Date(year, month, day));
+      const record = records[dateStr];
+      calendar.push({
+        date: day,
+        dateStr: dateStr,
+        weekday: new Date(year, month, day).getDay(),
+        completed: record && record.completed,
+        rating: record ? record.rating : null,
+        score: record ? record.finalScore : null
+      });
+    }
+
+    return calendar;
+  },
+
+  getMonthlyStats(year, month) {
+    const records = this.load();
+    const lastDay = new Date(year, month + 1, 0).getDate();
+    let completed = 0;
+    let totalScore = 0;
+    let bestScore = 0;
+
+    for (let day = 1; day <= lastDay; day++) {
+      const dateStr = getDateString(new Date(year, month, day));
+      const record = records[dateStr];
+      if (record && record.completed) {
+        completed++;
+        totalScore += record.finalScore || 0;
+        bestScore = Math.max(bestScore, record.finalScore || 0);
+      }
+    }
+
+    return {
+      completed,
+      totalDays: lastDay,
+      avgScore: completed > 0 ? Math.round(totalScore / completed) : 0,
+      bestScore
+    };
+  }
+};
+
+let isDailyChallengeMode = false;
+let isPracticeMode = false;
+
+function getTodayChallenge() {
+  const dateStr = getDateString();
+  const challenge = generateDailyChallenge(dateStr);
+  return challenge;
+}
+
+function startDailyChallenge(practice) {
+  const dateStr = getDateString();
+  const challenge = generateDailyChallenge(dateStr);
+
+  artifactTemplates[challenge.id] = challenge;
+  isDailyChallengeMode = true;
+  isPracticeMode = practice;
+
+  selectLevel(challenge.id);
+
+  if (practice) {
+    addLog("📝 练习模式：本次成绩不会记入每日挑战记录。");
+  } else {
+    if (dailyChallengeStore.hasCompleted(dateStr)) {
+      addLog("⚠️ 今日已有正式成绩，本次为练习模式。");
+      isPracticeMode = true;
+    } else {
+      addLog("🏆 每日挑战：完成后成绩将记入今日记录！");
+    }
+  }
+}
+
+const _origFreshStateDaily = freshState;
+freshState = function() {
+  const state = _origFreshStateDaily();
+  const template = artifactTemplates[currentTemplate];
+
+  if (template && template.isDailyChallenge) {
+    if (template.toolCounts) {
+      state.tools = { ...template.toolCounts };
+    }
+  }
+
+  return state;
+};
+
+const _origTryTriggerEventDaily = tryTriggerEvent;
+tryTriggerEvent = function() {
+  const template = artifactTemplates[currentTemplate];
+  if (!template || !template.isDailyChallenge || !template.eventModifiers) {
+    return _origTryTriggerEventDaily();
+  }
+
+  const events = Object.values(SITE_EVENTS);
+  const availableEvents = events.filter((evt) => {
+    const cooldown = state.eventCooldowns[evt.id] || 0;
+    return cooldown <= 0;
+  });
+
+  for (const evt of availableEvents) {
+    const prob = template.eventModifiers[evt.id] || evt.probability;
+    if (Math.random() < prob) {
+      const result = evt.apply(state, template);
+      if (result && result.success) {
+        state.triggeredEvents.push({ ...evt, message: result.message });
+        if (evt.key) {
+          state.keyEvents.push({ ...evt, message: result.message });
+        }
+        state.eventCooldowns[evt.id] = evt.cooldown;
+
+        Object.keys(state.eventCooldowns).forEach((id) => {
+          if (id !== evt.id && state.eventCooldowns[id] > 0) {
+            state.eventCooldowns[id] -= 1;
+          }
+        });
+
+        return evt;
+      }
+    }
+  }
+
+  Object.keys(state.eventCooldowns).forEach((id) => {
+    if (state.eventCooldowns[id] > 0) {
+      state.eventCooldowns[id] -= 1;
+    }
+  });
+
+  return null;
+};
+
+const _origFinishDaily = finish;
+finish = function(success, message) {
+  if (!state.running) return;
+
+  const template = artifactTemplates[currentTemplate];
+  const isDaily = template && template.isDailyChallenge;
+  const dateStr = template ? template.date : null;
+
+  _origFinishDaily(success, message);
+
+  if (isDaily && success && !isPracticeMode && dateStr) {
+    const scores = calculateExpertScore(template);
+    const rating = getRating(scores.totalScore);
+    const completeness = Math.round((state.locked.size / template.pieceDefs.length) * 100);
+
+    if (!dailyChallengeStore.hasCompleted(dateStr)) {
+      const record = {
+        date: dateStr,
+        completed: true,
+        levelId: template.id,
+        levelName: template.name,
+        timeUsed: template.timeLimit - state.timeLeft,
+        digs: state.digs,
+        completeness: completeness,
+        finalScore: scores.totalScore,
+        rating: rating,
+        scores: scores,
+        keyEvents: state.keyEvents,
+        hintsUsed: state.hintsUsed,
+        wrongAngleAttempts: state.wrongAngleAttempts,
+        toolsUsed: { ...state.toolsUsed },
+        completedAt: Date.now()
+      };
+      dailyChallengeStore.setRecord(dateStr, record);
+      addLog("🎉 每日挑战完成！成绩已记录。");
+    }
+  }
+
+  if (isDaily) {
+    const resultSection = document.getElementById("result");
+    const challengeInfo = document.createElement("div");
+    challengeInfo.className = "daily-challenge-result";
+
+    const todayRecord = dailyChallengeStore.getRecord(dateStr);
+    const streak = dailyChallengeStore.getStreak();
+
+    if (isPracticeMode) {
+      challengeInfo.innerHTML = `
+        <div class="practice-badge">📝 练习模式</div>
+        <p class="practice-note">本次为练习，不计入每日挑战成绩。</p>
+      `;
+    } else if (todayRecord && todayRecord.completed) {
+      challengeInfo.innerHTML = `
+        <div class="streak-info">🔥 连续完成 <strong>${streak}</strong> 天</div>
+        <p class="completed-note">今日挑战已完成！明天再来挑战吧。</p>
+      `;
+    }
+
+    resultSection.insertBefore(challengeInfo, resultSection.firstChild);
+  }
+};
+
+function renderDailyChallengeCard() {
+  const dateStr = getDateString();
+  const challenge = getTodayChallenge();
+  const hasCompleted = dailyChallengeStore.hasCompleted(dateStr);
+  const record = dailyChallengeStore.getRecord(dateStr);
+  const streak = dailyChallengeStore.getStreak();
+
+  const levelSelect = document.getElementById("levelSelect");
+  const levelSelectHeader = levelSelect.querySelector(".level-select-header");
+  let dailySection = document.getElementById("dailyChallengeSection");
+
+  if (!dailySection) {
+    dailySection = document.createElement("div");
+    dailySection.id = "dailyChallengeSection";
+    dailySection.className = "level-list-section daily-challenge-section";
+    levelSelect.insertBefore(dailySection, levelSelectHeader.nextSibling);
+  }
+
+  let statusText = "今日待挑战";
+  let statusClass = "pending";
+  if (hasCompleted) {
+    statusText = `已完成 · ${record.rating}级 · ${record.finalScore}分`;
+    statusClass = "completed";
+  }
+
+  dailySection.innerHTML = `
+    <h3 class="section-subtitle">
+      <span class="daily-icon">🎯</span> 每日挑战
+      <span class="streak-badge">🔥 连续 ${streak} 天</span>
+    </h3>
+    <div class="daily-challenge-card ${statusClass}">
+      <div class="daily-challenge-header">
+        <div class="daily-date">${dateStr}</div>
+        <div class="daily-status">${statusText}</div>
+      </div>
+      <div class="daily-challenge-info">
+        <div class="daily-level-icon level-icon ${challenge.iconClass}">
+          ${hasCompleted && record.rating ? `<div class="level-rating level-rating-${record.rating}">${record.rating}</div>` : ''}
+        </div>
+        <div class="daily-challenge-details">
+          <h4>${challenge.name}</h4>
+          <p>目标评级：<strong>${challenge.targetRating}</strong> · 目标分数：<strong>${challenge.targetScore}</strong></p>
+          <p>${challenge.pieceDefs.length} 片碎片 · ${challenge.timeLimit} 秒</p>
+        </div>
+      </div>
+      <div class="daily-challenge-actions">
+        <button id="startDailyBtn" type="button" class="daily-start-btn">
+          ${hasCompleted ? "🔄 再练一次" : "🎮 开始挑战"}
+        </button>
+        <button id="viewCalendarBtn" type="button" class="daily-calendar-btn">📅 历史日历</button>
+      </div>
+    </div>
+  `;
+
+  const startBtn = document.getElementById("startDailyBtn");
+  if (startBtn) {
+    startBtn.addEventListener("click", () => {
+      startDailyChallenge(hasCompleted);
+    });
+  }
+
+  const calendarBtn = document.getElementById("viewCalendarBtn");
+  if (calendarBtn) {
+    calendarBtn.addEventListener("click", openCalendarModal);
+  }
+}
+
+function openCalendarModal() {
+  let modal = document.getElementById("calendarModal");
+  if (!modal) {
+    modal = document.createElement("div");
+    modal.id = "calendarModal";
+    modal.className = "modal hidden";
+    modal.innerHTML = `
+      <div class="modal-content calendar-modal-content">
+        <div class="modal-header">
+          <h2>📅 挑战日历</h2>
+          <button id="closeCalendarBtn" type="button" class="close-btn">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="calendar-nav">
+            <button id="prevMonthBtn" type="button" class="secondary-btn">← 上月</button>
+            <span id="currentMonthLabel" class="current-month-label"></span>
+            <button id="nextMonthBtn" type="button" class="secondary-btn">下月 →</button>
+          </div>
+          <div class="calendar-stats">
+            <div class="calendar-stat">
+              <span class="calendar-stat-label">本月完成</span>
+              <span id="monthCompleted" class="calendar-stat-value">0</span>
+            </div>
+            <div class="calendar-stat">
+              <span class="calendar-stat-label">平均分</span>
+              <span id="monthAvgScore" class="calendar-stat-value">0</span>
+            </div>
+            <div class="calendar-stat">
+              <span class="calendar-stat-label">最高分</span>
+              <span id="monthBestScore" class="calendar-stat-value">0</span>
+            </div>
+            <div class="calendar-stat">
+              <span class="calendar-stat-label">连续天数</span>
+              <span id="currentStreak" class="calendar-stat-value">0</span>
+            </div>
+          </div>
+          <div class="calendar-grid-header">
+            <span>日</span><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span>
+          </div>
+          <div id="calendarGrid" class="calendar-grid"></div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+
+    document.getElementById("closeCalendarBtn").addEventListener("click", closeCalendarModal);
+    document.getElementById("prevMonthBtn").addEventListener("click", () => {
+      calendarCurrentDate.setMonth(calendarCurrentDate.getMonth() - 1);
+      renderCalendar();
+    });
+    document.getElementById("nextMonthBtn").addEventListener("click", () => {
+      calendarCurrentDate.setMonth(calendarCurrentDate.getMonth() + 1);
+      renderCalendar();
+    });
+
+    modal.addEventListener("click", (e) => {
+      if (e.target === modal) closeCalendarModal();
+    });
+  }
+
+  calendarCurrentDate = new Date();
+  renderCalendar();
+  modal.classList.remove("hidden");
+}
+
+function closeCalendarModal() {
+  const modal = document.getElementById("calendarModal");
+  if (modal) modal.classList.add("hidden");
+}
+
+let calendarCurrentDate = new Date();
+
+function renderCalendar() {
+  const year = calendarCurrentDate.getFullYear();
+  const month = calendarCurrentDate.getMonth();
+
+  document.getElementById("currentMonthLabel").textContent = `${year}年${month + 1}月`;
+
+  const stats = dailyChallengeStore.getMonthlyStats(year, month);
+  const streak = dailyChallengeStore.getStreak();
+
+  document.getElementById("monthCompleted").textContent = `${stats.completed}/${stats.totalDays}`;
+  document.getElementById("monthAvgScore").textContent = stats.avgScore;
+  document.getElementById("monthBestScore").textContent = stats.bestScore;
+  document.getElementById("currentStreak").textContent = streak;
+
+  const calendarData = dailyChallengeStore.getCalendarData(year, month);
+  const grid = document.getElementById("calendarGrid");
+  grid.innerHTML = "";
+
+  const todayStr = getDateString();
+
+  calendarData.forEach((day) => {
+    const cell = document.createElement("div");
+    cell.className = "calendar-cell";
+
+    if (!day.date) {
+      cell.classList.add("empty");
+    } else {
+      cell.textContent = day.date;
+
+      if (day.dateStr === todayStr) {
+        cell.classList.add("today");
+      }
+
+      if (day.completed) {
+        cell.classList.add("completed");
+        if (day.rating) {
+          cell.classList.add(`rating-${day.rating}`);
+          const ratingBadge = document.createElement("span");
+          ratingBadge.className = "calendar-rating";
+          ratingBadge.textContent = day.rating;
+          cell.appendChild(ratingBadge);
+        }
+      }
+
+      if (day.dateStr && day.completed) {
+        cell.title = `${day.dateStr} · 得分：${day.score || 0} · 评级：${day.rating || '-'}`;
+      }
+    }
+
+    grid.appendChild(cell);
+  });
+}
+
+const _origInitDaily = init;
+init = function() {
+  _origInitDaily();
+  renderDailyChallengeCard();
+};
+
+const _origGoBackDaily = goBack;
+goBack = function() {
+  clearInterval(timer);
+  if (tutorial.active) tutorial.skip();
+
+  if (currentTemplate && artifactTemplates[currentTemplate] && artifactTemplates[currentTemplate].isDailyChallenge) {
+    delete artifactTemplates[currentTemplate];
+    currentTemplate = null;
+    isDailyChallengeMode = false;
+    isPracticeMode = false;
+    currentMobileTab = "dig";
+    switchMobileTab(currentMobileTab);
+    levelSelectEl.classList.remove("hidden");
+    gameAreaEl.classList.add("hidden");
+    resultEl.classList.add("hidden");
+    backBtn.classList.add("hidden");
+    levelDescriptionEl.textContent = "";
+    levelDescriptionEl.classList.add("hidden");
+    piecesEl.innerHTML = "";
+    resetStatsDisplay();
+    renderDailyChallengeCard();
+    return;
+  }
+
+  if (currentTemplate && currentTemplate.startsWith("__preview__")) {
+    delete artifactTemplates[currentTemplate];
+    currentTemplate = null;
+    currentMobileTab = "dig";
+    switchMobileTab(currentMobileTab);
+    document.getElementById("levelEditor").classList.remove("hidden");
+    document.getElementById("levelSelect").classList.add("hidden");
+    gameAreaEl.classList.add("hidden");
+    resultEl.classList.add("hidden");
+    backBtn.classList.add("hidden");
+    levelDescriptionEl.textContent = "";
+    levelDescriptionEl.classList.add("hidden");
+    piecesEl.innerHTML = "";
+    resetStatsDisplay();
+    return;
+  }
+
+  if (currentTemplate && customLevelsStore.get(currentTemplate)) {
+    delete artifactTemplates[currentTemplate];
+  }
+  _origGoBackDaily();
+  renderDailyChallengeCard();
+};
+
 init();
