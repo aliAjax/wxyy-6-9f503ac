@@ -235,12 +235,12 @@
     </div>
 
     <section id="gameArea" class="layout hidden">
-      <div class="mobile-tabs">
-        <button class="mobile-tab-btn active" data-tab="dig">⛏️ 探方</button>
-        <button class="mobile-tab-btn" data-tab="repair">🔧 修复</button>
-        <button class="mobile-tab-btn" data-tab="notes">📝 记录</button>
+      <div class="mobile-tabs" role="tablist" aria-label="游戏区域切换">
+        <button class="mobile-tab-btn active" data-tab="dig" role="tab" aria-selected="true" aria-controls="digTab" tabindex="0">⛏️ 探方</button>
+        <button class="mobile-tab-btn" data-tab="repair" role="tab" aria-selected="false" aria-controls="repairTab" tabindex="-1">🔧 修复</button>
+        <button class="mobile-tab-btn" data-tab="notes" role="tab" aria-selected="false" aria-controls="notesTab" tabindex="-1">📝 记录</button>
       </div>
-      <section class="dig-site">
+      <section class="dig-site" id="digTab" role="tabpanel">
         <div class="section-title">
           <h2>探方 · <span id="levelName">陶碗</span></h2>
           <div class="section-actions">
@@ -272,7 +272,7 @@
         </div>
       </section>
 
-      <section class="lab">
+      <section class="lab" id="repairTab" role="tabpanel">
         <div class="section-title">
           <h2>修复台</h2>
           <div class="section-actions">
@@ -287,7 +287,7 @@
         </div>
       </section>
 
-      <aside class="notes">
+      <aside class="notes" id="notesTab" role="tabpanel">
         <h2>现场记录</h2>
         <div id="log" class="log"></div>
       </aside>

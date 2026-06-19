@@ -27,6 +27,29 @@ button:disabled {
   cursor: not-allowed;
 }
 
+button:focus-visible,
+.piece:focus-visible {
+  outline: 3px solid #c49b62;
+  outline-offset: 2px;
+}
+
+.cell:focus-visible {
+  outline: 3px solid #314c53;
+  box-shadow: 0 0 0 3px rgba(49, 76, 83, 0.3);
+}
+
+.piece:focus-visible {
+  outline: 3px solid #698980;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 3px rgba(105, 137, 128, 0.4), 0 10px 20px rgba(83, 52, 31, .22);
+}
+
+.tool-btn:focus-visible {
+  outline: 3px solid #314c53;
+  outline-offset: 2px;
+  transform: translateY(-2px);
+}
+
 .shell {
   width: min(1200px, calc(100vw - 28px));
   margin: 0 auto;
@@ -1431,6 +1454,30 @@ h2 {
 .tool-btn.active .tool-count {
   background: #fff8e7;
   color: #a83232;
+}
+
+.tool-shortcut {
+  position: absolute;
+  top: -8px;
+  left: -8px;
+  width: 22px;
+  height: 22px;
+  background: #7d4c21;
+  color: #fff8e7;
+  border-radius: 50%;
+  font-size: 11px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  border: 2px solid #fff4d9;
+}
+
+.tool-btn.active .tool-shortcut {
+  background: #fff8e7;
+  color: #7d4c21;
+  border-color: #314c53;
 }
 
 .cell.probe-hinted {

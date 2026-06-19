@@ -75,6 +75,25 @@ let gestureState = {
   pieceAngle: 0
 };
 
+const keyboardNav = {
+  activeRegion: "grid",
+  focusedCellIndex: 0,
+  focusedPieceIndex: 0,
+  moveStep: 10,
+  rotateStep: 45,
+  getGridCols() {
+    const template = artifactTemplates[currentTemplate];
+    return Math.sqrt(template.gridSize || 25);
+  },
+  getGridSize() {
+    const template = artifactTemplates[currentTemplate];
+    return template.gridSize || 25;
+  },
+  getUnlockedPieces() {
+    return Array.from(document.querySelectorAll(".piece:not(.locked)"));
+  }
+};
+
 const ARCHIVE_STORAGE_KEY = "archaeology_archive_records";
 const TUTORIAL_STORAGE_KEY = "archaeology_tutorial_done";
 const SETTINGS_STORAGE_KEY = "archaeology_game_settings";
@@ -1057,7 +1076,8 @@ function freshState() {
     probeHints: new Set(),
     activeTool: null,
     compassActive: false,
-    toolPackage: { ...toolsInit }
+    toolPackage: { ...toolsInit },
+    keyboardMode: false
   };
 }
 
@@ -1512,11 +1532,105 @@ function init() {
 
   document.addEventListener("keydown", (e) => {
     if (!state || !state.running) return;
-    if (e.key === "1") useTool("probe");
-    if (e.key === "2") useTool("brush");
-    if (e.key === "3") useTool("compass");
-    if (e.key === "4") useTool("trowel");
-    if (e.key === "Escape") cancelToolMode();
+
+    if (e.key === "1") {
+      e.preventDefault();
+      useTool("probe");
+      return;
+    }
+    if (e.key === "2") {
+      e.preventDefault();
+      useTool("brush");
+      return;
+    }
+    if (e.key === "3") {
+      e.preventDefault();
+      useTool("compass");
+      return;
+    }
+    if (e.key === "4") {
+      e.preventDefault();
+      useTool("trowel");
+      return;
+    }
+    if (e.key === "Escape") {
+      e.preventDefault();
+      cancelToolMode();
+      deselectPiece();
+      return;
+    }
+
+    if (e.key === "Tab") {
+      e.preventDefault();
+      switchKeyboardRegion(!e.shiftKey);
+      return;
+    }
+
+    const activeEl = document.activeElement;
+
+    if (activeEl && activeEl.classList.contains("cell")) {
+      if (e.key === "ArrowUp" || e.key === "ArrowDown" ||
+          e.key === "ArrowLeft" || e.key === "ArrowRight") {
+        e.preventDefault();
+        moveGridFocus(e.key);
+      } else if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        const index = parseInt(activeEl.dataset.index);
+        if (!isNaN(index)) dig(index);
+      }
+      return;
+    }
+
+    if (activeEl && activeEl.classList.contains("piece") &&
+        !activeEl.classList.contains("locked")) {
+      if (e.key === "ArrowUp" || e.key === "ArrowDown" ||
+          e.key === "ArrowLeft" || e.key === "ArrowRight") {
+        e.preventDefault();
+        movePieceWithKeyboard(activeEl, e.key);
+      } else if (e.key === "r" || e.key === "R") {
+        e.preventDefault();
+        rotatePiece(activeEl);
+      } else if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        trySnap(activeEl);
+      } else if (e.key === "[" || e.key === "]") {
+        e.preventDefault();
+        focusNextPiece(e.key === "]");
+      }
+      return;
+    }
+
+    if (keyboardNav.activeRegion === "grid") {
+      if (e.key === "ArrowUp" || e.key === "ArrowDown" ||
+          e.key === "ArrowLeft" || e.key === "ArrowRight") {
+        e.preventDefault();
+        moveGridFocus(e.key);
+      } else if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        dig(keyboardNav.focusedCellIndex);
+      }
+    } else if (keyboardNav.activeRegion === "pieces") {
+      if (e.key === "ArrowUp" || e.key === "ArrowDown" ||
+          e.key === "ArrowLeft" || e.key === "ArrowRight") {
+        e.preventDefault();
+        const pieces = keyboardNav.getUnlockedPieces();
+        const currentPiece = pieces[keyboardNav.focusedPieceIndex];
+        if (currentPiece) movePieceWithKeyboard(currentPiece, e.key);
+      } else if (e.key === "r" || e.key === "R") {
+        e.preventDefault();
+        const pieces = keyboardNav.getUnlockedPieces();
+        const currentPiece = pieces[keyboardNav.focusedPieceIndex];
+        if (currentPiece) rotatePiece(currentPiece);
+      } else if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        const pieces = keyboardNav.getUnlockedPieces();
+        const currentPiece = pieces[keyboardNav.focusedPieceIndex];
+        if (currentPiece) trySnap(currentPiece);
+      } else if (e.key === "[" || e.key === "]") {
+        e.preventDefault();
+        focusNextPiece(e.key === "]");
+      }
+    }
   });
 
   tutorialBtn.addEventListener("click", () => {
@@ -1582,6 +1696,7 @@ function init() {
   window.addEventListener("orientationchange", handleOrientationChange);
 
   updateIsMobile();
+  setupMobileTabKeyboard();
 
   gameSettings.syncUI();
 
@@ -1605,13 +1720,13 @@ function selectLevel(templateId, skipAutoTutorial = false) {
   levelSelectEl.classList.add("hidden");
   gameAreaEl.classList.remove("hidden");
   backBtn.classList.remove("hidden");
-  if (isMobile) {
-    switchMobileTab(currentMobileTab);
-  }
   state = freshState();
   piecesEl.innerHTML = "";
   resultEl.classList.add("hidden");
   resetStatsDisplay(templateId);
+  if (isMobile) {
+    switchMobileTab(currentMobileTab);
+  }
   render();
 
   if (!skipAutoTutorial && gameSettings.get("autoTutorial") && !tutorial.isDone() && !tutorial.active) {
@@ -1884,6 +1999,7 @@ function goBack() {
 function start() {
   if (state.running) return;
   state.running = true;
+  state.keyboardMode = true;
   resultEl.classList.add("hidden");
   const template = artifactTemplates[currentTemplate];
   addLog(`计时开始，${template.name}进入抢救性发掘。`);
@@ -1897,6 +2013,13 @@ function start() {
   }, 1000);
   render();
   tutorial.notifyAction("start");
+
+  setTimeout(() => {
+    keyboardNav.activeRegion = "grid";
+    keyboardNav.focusedCellIndex = 0;
+    const firstCell = gridEl.querySelector(".cell:not(:disabled)");
+    if (firstCell) firstCell.focus();
+  }, 50);
 }
 
 function reset() {
@@ -2105,6 +2228,10 @@ function spawnPiece(id) {
   piece.className = "piece";
   piece.dataset.id = id;
   piece.dataset.angle = String(def.initialAngle);
+  piece.tabIndex = 0;
+  piece.setAttribute("role", "button");
+  piece.setAttribute("aria-label", `${def.label}${template.pieceName}，按方向键移动，R键旋转，空格键尝试贴合`);
+  piece.setAttribute("aria-grabbed", "false");
   piece.style.width = `${style.width}px`;
   piece.style.height = `${style.height}px`;
   piece.style.background = style.background;
@@ -2164,6 +2291,33 @@ function spawnPiece(id) {
   piece.addEventListener("pointerdown", startDrag);
   piece.addEventListener("touchstart", handleTouchStart, { passive: false });
   piece.addEventListener("dblclick", () => rotatePiece(piece));
+  piece.addEventListener("focus", () => {
+    keyboardNav.activeRegion = "pieces";
+    selectPiece(piece);
+    const pieces = keyboardNav.getUnlockedPieces();
+    keyboardNav.focusedPieceIndex = pieces.indexOf(piece);
+  });
+  piece.addEventListener("keydown", (e) => {
+    if (piece.classList.contains("locked")) return;
+    const target = e.currentTarget;
+
+    if (e.key === "ArrowLeft" || e.key === "ArrowRight" ||
+        e.key === "ArrowUp" || e.key === "ArrowDown") {
+      e.preventDefault();
+      e.stopPropagation();
+      movePieceWithKeyboard(target, e.key);
+    } else if (e.key === "r" || e.key === "R") {
+      e.preventDefault();
+      e.stopPropagation();
+      rotatePiece(target);
+    } else if (e.key === " " || e.key === "Enter") {
+      e.preventDefault();
+      e.stopPropagation();
+      trySnap(target);
+    } else if (e.key === "Tab") {
+      e.stopPropagation();
+    }
+  });
   piecesEl.appendChild(piece);
   pieceInitialPositions.set(id, {
     left: piece.style.left,
@@ -2172,6 +2326,116 @@ function spawnPiece(id) {
 
   if (isMobile && state.found.size === 1) {
     pulseMobileTab("repair");
+  }
+}
+
+function movePieceWithKeyboard(piece, direction) {
+  if (piece.classList.contains("locked")) return;
+  const step = keyboardNav.moveStep;
+  const rect = piecesEl.getBoundingClientRect();
+  const pieceWidth = piece.offsetWidth;
+  const pieceHeight = piece.offsetHeight;
+
+  let left = parseFloat(piece.style.left) || 0;
+  let top = parseFloat(piece.style.top) || 0;
+
+  switch (direction) {
+    case "ArrowLeft":
+      left = Math.max(0, left - step);
+      break;
+    case "ArrowRight":
+      left = Math.min(rect.width - pieceWidth, left + step);
+      break;
+    case "ArrowUp":
+      top = Math.max(0, top - step);
+      break;
+    case "ArrowDown":
+      top = Math.min(rect.height - pieceHeight, top + step);
+      break;
+  }
+
+  piece.style.left = `${left}px`;
+  piece.style.top = `${top}px`;
+  updateSnapFeedback(piece);
+}
+
+function moveGridFocus(direction) {
+  const cols = keyboardNav.getGridCols();
+  const gridSize = keyboardNav.getGridSize();
+  let current = keyboardNav.focusedCellIndex;
+  let row = Math.floor(current / cols);
+  let col = current % cols;
+
+  switch (direction) {
+    case "ArrowUp":
+      row = Math.max(0, row - 1);
+      break;
+    case "ArrowDown":
+      row = Math.min(Math.floor((gridSize - 1) / cols), row + 1);
+      break;
+    case "ArrowLeft":
+      col = Math.max(0, col - 1);
+      break;
+    case "ArrowRight":
+      col = Math.min(cols - 1, col + 1);
+      break;
+  }
+
+  const newIndex = row * cols + col;
+  keyboardNav.focusedCellIndex = newIndex;
+  const cells = gridEl.querySelectorAll(".cell");
+  if (cells[newIndex]) {
+    cells[newIndex].focus();
+  }
+}
+
+function focusNextPiece(forward = true) {
+  const pieces = keyboardNav.getUnlockedPieces();
+  if (pieces.length === 0) return;
+
+  let newIndex = keyboardNav.focusedPieceIndex;
+  if (forward) {
+    newIndex = (newIndex + 1) % pieces.length;
+  } else {
+    newIndex = (newIndex - 1 + pieces.length) % pieces.length;
+  }
+
+  keyboardNav.focusedPieceIndex = newIndex;
+  if (pieces[newIndex]) {
+    pieces[newIndex].focus();
+  }
+}
+
+function switchKeyboardRegion(forward = true) {
+  const regions = ["grid", "tools", "pieces"];
+  let currentIndex = regions.indexOf(keyboardNav.activeRegion);
+  if (currentIndex === -1) currentIndex = 0;
+
+  if (forward) {
+    currentIndex = (currentIndex + 1) % regions.length;
+  } else {
+    currentIndex = (currentIndex - 1 + regions.length) % regions.length;
+  }
+
+  const newRegion = regions[currentIndex];
+  keyboardNav.activeRegion = newRegion;
+
+  switch (newRegion) {
+    case "grid":
+      renderGrid();
+      break;
+    case "tools":
+      const firstToolBtn = document.querySelector(".tool-btn:not(.hidden):not(:disabled)");
+      if (firstToolBtn) firstToolBtn.focus();
+      break;
+    case "pieces":
+      const pieces = keyboardNav.getUnlockedPieces();
+      if (pieces.length > 0) {
+        pieces[keyboardNav.focusedPieceIndex % pieces.length]?.focus();
+      } else {
+        switchKeyboardRegion(forward);
+      }
+      break;
   }
 }
 
@@ -2404,12 +2668,55 @@ function switchMobileTab(tabName) {
   currentMobileTab = tabName;
 
   document.querySelectorAll(".mobile-tab-btn").forEach((btn) => {
-    btn.classList.toggle("active", btn.dataset.tab === tabName);
+    const isActive = btn.dataset.tab === tabName;
+    btn.classList.toggle("active", isActive);
+    btn.setAttribute("aria-selected", isActive);
+    btn.tabIndex = isActive ? 0 : -1;
   });
 
   digSiteSection.classList.toggle("mobile-hidden", tabName !== "dig");
   labSection.classList.toggle("mobile-hidden", tabName !== "repair");
   notesSection.classList.toggle("mobile-hidden", tabName !== "notes");
+
+  if (state && state.running) {
+    if (tabName === "dig") {
+      keyboardNav.activeRegion = "grid";
+      renderGrid();
+    } else if (tabName === "repair") {
+      keyboardNav.activeRegion = "pieces";
+      const pieces = keyboardNav.getUnlockedPieces();
+      if (pieces.length > 0) {
+        pieces[keyboardNav.focusedPieceIndex % pieces.length]?.focus();
+      }
+    }
+  }
+}
+
+function setupMobileTabKeyboard() {
+  const tabs = document.querySelectorAll(".mobile-tab-btn");
+  tabs.forEach((tab, index) => {
+    tab.addEventListener("keydown", (e) => {
+      const tabsArray = Array.from(tabs);
+      let newIndex = index;
+
+      if (e.key === "ArrowRight" || e.key === "ArrowDown") {
+        e.preventDefault();
+        newIndex = (index + 1) % tabsArray.length;
+      } else if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
+        e.preventDefault();
+        newIndex = (index - 1 + tabsArray.length) % tabsArray.length;
+      } else if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        switchMobileTab(tab.dataset.tab);
+        return;
+      }
+
+      if (newIndex !== index && tabsArray[newIndex]) {
+        tabsArray[newIndex].focus();
+        switchMobileTab(tabsArray[newIndex].dataset.tab);
+      }
+    });
+  });
 }
 
 function toggleFocusMode() {
@@ -2806,6 +3113,8 @@ function renderTools() {
   const allBtns = [probeBtn, brushBtn, compassBtn, trowelBtn];
   allBtns.forEach(b => b.classList.add("hidden"));
 
+  const toolShortcuts = { probe: "1", brush: "2", compass: "3", trowel: "4" };
+
   function renderToolButton(btnEl, toolId) {
     const count = state.tools[toolId] || 0;
     if (count <= 0 && state.activeTool !== toolId) {
@@ -2817,15 +3126,22 @@ function renderTools() {
     btnEl.classList.remove("hidden");
     const check = tool.canUse(state, template);
     const isActive = state.activeTool === toolId;
+    const shortcut = toolShortcuts[toolId];
 
     btnEl.innerHTML = `
       <span class="tool-icon">${tool.icon}</span>
       <span class="tool-name">${tool.name}</span>
       <span class="tool-count">${count}</span>
+      <span class="tool-shortcut" aria-hidden="true">${shortcut}</span>
     `;
-    btnEl.title = `${tool.name}：${tool.description}（剩余${count}次）`;
+    btnEl.title = `${tool.name}：${tool.description}（剩余${count}次，快捷键 ${shortcut}）`;
     btnEl.disabled = !check.ok && !isActive;
     btnEl.classList.toggle("active", isActive);
+    btnEl.setAttribute("aria-pressed", isActive);
+    btnEl.setAttribute("aria-label", `${tool.name}工具，快捷键 ${shortcut}，剩余${count}次`);
+    btnEl.addEventListener("focus", () => {
+      keyboardNav.activeRegion = "tools";
+    });
   }
 
   renderToolButton(probeBtn, "probe");
@@ -2842,11 +3158,23 @@ function renderGrid() {
   gridEl.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
   gridEl.classList.toggle("brush-mode", state.activeTool === "brush");
   gridEl.classList.toggle("trowel-mode", state.activeTool === "trowel");
+  gridEl.setAttribute("role", "grid");
+  gridEl.setAttribute("aria-label", "探方格，使用方向键导航，回车键挖掘");
+  gridEl.setAttribute("aria-rowcount", cols);
+  gridEl.setAttribute("aria-colcount", cols);
 
   for (let i = 0; i < gridSize; i += 1) {
     const cell = document.createElement("button");
     cell.type = "button";
     cell.className = "cell";
+    cell.dataset.index = i;
+    const row = Math.floor(i / cols);
+    const col = i % cols;
+    cell.setAttribute("role", "gridcell");
+    cell.setAttribute("aria-rowindex", row + 1);
+    cell.setAttribute("aria-colindex", col + 1);
+    cell.setAttribute("aria-label", `第${row + 1}行第${col + 1}列`);
+
     if (state.dug.has(i)) cell.classList.add("dug");
     if (state.found.has(template.buried[i])) cell.classList.add("found");
     if (state.lockedCells.has(i)) cell.classList.add("locked-cell");
@@ -2857,18 +3185,37 @@ function renderGrid() {
 
     if (state.dug.has(i)) {
       cell.textContent = template.buried[i] ? template.pieceName : "土";
+      cell.setAttribute("aria-label", `第${row + 1}行第${col + 1}列，已挖掘，${template.buried[i] ? "发现" + template.pieceName : "只有土"}`);
     } else if (state.lockedCells.has(i)) {
       cell.textContent = "⚠";
+      cell.setAttribute("aria-label", `第${row + 1}行第${col + 1}列，已锁定，无法挖掘`);
     } else if (state.hintedCells.has(i)) {
       cell.textContent = "?";
+      cell.setAttribute("aria-label", `第${row + 1}行第${col + 1}列，提示位置`);
     } else if (state.probeHints.has(i)) {
       cell.textContent = "◎";
+      cell.setAttribute("aria-label", `第${row + 1}行第${col + 1}列，探针标记`);
     } else {
       cell.textContent = "";
     }
     cell.disabled = !state.running || state.dug.has(i) || state.lockedCells.has(i);
     cell.addEventListener("click", () => dig(i));
+    cell.addEventListener("focus", () => {
+      keyboardNav.focusedCellIndex = i;
+      keyboardNav.activeRegion = "grid";
+    });
     gridEl.appendChild(cell);
+  }
+
+  if (keyboardNav.activeRegion === "grid") {
+    const cells = gridEl.querySelectorAll(".cell");
+    const targetIndex = Math.min(keyboardNav.focusedCellIndex, cells.length - 1);
+    if (cells[targetIndex] && !cells[targetIndex].disabled) {
+      cells[targetIndex].focus();
+    } else {
+      const firstEnabled = Array.from(cells).find(c => !c.disabled);
+      if (firstEnabled) firstEnabled.focus();
+    }
   }
 }
 
