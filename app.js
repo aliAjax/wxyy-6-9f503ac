@@ -3861,7 +3861,9 @@ const editor = {
     window.__origGoBack = origGoBack;
     const checkCleanup = setInterval(() => {
       if (document.getElementById("levelSelect").classList.contains("hidden") === false) {
-        delete artifactTemplates[tempId];
+        if (tempId.startsWith("__preview__")) {
+          delete artifactTemplates[tempId];
+        }
         clearInterval(checkCleanup);
         document.getElementById("levelEditor").classList.remove("hidden");
         document.getElementById("levelSelect").classList.add("hidden");
@@ -4071,7 +4073,7 @@ goBack = function () {
     return;
   }
 
-  if (currentTemplate && customLevelsStore.get(currentTemplate)) {
+  if (currentTemplate && customLevelsStore.get(currentTemplate) && !artifactTemplates[currentTemplate]?.isDailyChallenge && !currentTemplate.startsWith("daily_")) {
     delete artifactTemplates[currentTemplate];
   }
   _origGoBack();
@@ -4316,7 +4318,12 @@ let isPracticeMode = false;
 
 function getTodayChallenge() {
   const dateStr = getDateString();
+  const expectedId = `daily_${dateStr}`;
+  if (artifactTemplates[expectedId] && artifactTemplates[expectedId].isDailyChallenge) {
+    return artifactTemplates[expectedId];
+  }
   const challenge = generateDailyChallenge(dateStr);
+  artifactTemplates[challenge.id] = challenge;
   return challenge;
 }
 
@@ -4545,7 +4552,9 @@ finish = function(success, message) {
 function renderDailyChallengeCard() {
   const dateStr = getDateString();
   const challenge = getTodayChallenge();
-  artifactTemplates[challenge.id] = challenge;
+  if (!artifactTemplates[challenge.id]) {
+    artifactTemplates[challenge.id] = challenge;
+  }
   const hasCompleted = dailyChallengeStore.hasCompleted(dateStr);
   const record = dailyChallengeStore.getRecord(dateStr);
   const streak = dailyChallengeStore.getStreak();
@@ -4758,7 +4767,6 @@ goBack = function() {
   if (tutorial.active) tutorial.skip();
 
   if (currentTemplate && artifactTemplates[currentTemplate] && artifactTemplates[currentTemplate].isDailyChallenge) {
-    delete artifactTemplates[currentTemplate];
     currentTemplate = null;
     isDailyChallengeMode = false;
     isPracticeMode = false;
@@ -4793,7 +4801,7 @@ goBack = function() {
     return;
   }
 
-  if (currentTemplate && customLevelsStore.get(currentTemplate)) {
+  if (currentTemplate && customLevelsStore.get(currentTemplate) && !artifactTemplates[currentTemplate]?.isDailyChallenge && !currentTemplate.startsWith("daily_")) {
     delete artifactTemplates[currentTemplate];
   }
   _origGoBackDaily();
