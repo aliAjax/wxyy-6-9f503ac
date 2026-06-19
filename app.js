@@ -109,7 +109,7 @@ const SEEDED_RANDOM = {
   },
   next() {
     this._seed = (this._seed * 1664525 + 1013904223) >>> 0;
-    return (this._seed & 0xffffffff) / 0x100000000;
+    return this._seed / 0x100000000;
   },
   range(min, max) { return min + this.next() * (max - min); },
   int(min, max) { return Math.floor(this.range(min, max + 1)); },
