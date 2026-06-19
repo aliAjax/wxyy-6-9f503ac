@@ -559,6 +559,22 @@ h2 {
   margin-right: 6px;
 }
 
+.record-toolkit {
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: rgba(105, 137, 128, 0.1);
+  border-radius: 6px;
+  font-size: 12px;
+  color: #4a6b62;
+  border: 1px dashed rgba(105, 137, 128, 0.35);
+}
+
+.record-toolkit-label {
+  font-weight: 700;
+  color: #314c53;
+  margin-right: 6px;
+}
+
 .settlement-tools-used {
   margin-top: 16px;
   padding: 12px 16px;
@@ -1341,9 +1357,13 @@ h2 {
 
 .tools-panel {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
   gap: 10px;
   margin-bottom: 14px;
+}
+
+.tool-btn.hidden {
+  display: none !important;
 }
 
 .tool-btn {
@@ -1433,6 +1453,12 @@ h2 {
   background: #698980;
   border-color: #4a6b62;
   cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="%23fff8e7" stroke-width="2"><path d="M18 3v4a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V3"/><path d="M20 21V7"/><path d="M4 21V7"/><path d="M8 21V7"/><path d="M12 21V7"/><path d="M16 21V7"/></svg>') 12 0, auto;
+}
+
+.cell.trowel-mode:hover:not(:disabled):not(.dug) {
+  background: #7a6b4f;
+  border-color: #5a4d35;
+  cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="%23fff8e7" stroke-width="2"><path d="M14.7 6.3a4.95 4.95 0 0 1 7 7l-1.5 1.5-7-7 1.5-1.5z"/><path d="M13 8l-8.5 8.5-1.5 1.5 2.5 2.5 1.5-1.5L15 10"/><path d="M3 21l3-3"/></svg>') 12 0, auto;
 }
 
 .compass-indicator {
@@ -1688,6 +1714,62 @@ h2 {
     font-size: 10px;
     top: -4px;
     right: -4px;
+  }
+
+  .tools-panel {
+    grid-template-columns: repeat(auto-fit, minmax(70px, 1fr));
+    gap: 5px;
+  }
+
+  .toolkit-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+    padding: 8px 10px;
+  }
+
+  .toolkit-header-info {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .toolkit-points-label {
+    font-size: 12px;
+  }
+
+  .toolkit-points-value {
+    font-size: 18px;
+  }
+
+  .toolkit-list {
+    gap: 6px;
+  }
+
+  .toolkit-item {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    padding: 8px 10px;
+  }
+
+  .toolkit-item-controls {
+    margin-left: 0;
+    justify-content: flex-end;
+    align-self: flex-end;
+  }
+
+  .toolkit-item-icon {
+    font-size: 20px;
+  }
+
+  .toolkit-btn {
+    width: 30px;
+    height: 30px;
+    font-size: 18px;
+  }
+
+  .toolkit-item-count {
+    font-size: 16px;
   }
 
   .grid {
@@ -2177,8 +2259,8 @@ h2 {
 
 .preview-tools {
   display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
+  flex-direction: column;
+  gap: 0;
 }
 
 .preview-tool {
@@ -2215,6 +2297,225 @@ h2 {
 .preview-tool-count {
   font-size: 11px;
   color: #7d4c21;
+}
+
+.toolkit-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  background: #fff4d9;
+  border: 2px solid #c49b62;
+  border-radius: 8px;
+  margin-bottom: 12px;
+}
+
+.toolkit-header-info {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  font-weight: 700;
+  font-size: 14px;
+  color: #314c53;
+}
+
+.toolkit-points-label {
+  font-weight: 600;
+  color: #5a4d35;
+  font-size: 13px;
+}
+
+.toolkit-points-value {
+  font-size: 20px;
+  color: #698980;
+  font-weight: 800;
+}
+
+.toolkit-points-value.over {
+  color: #a83232;
+}
+
+.toolkit-points-sep {
+  color: #9a8570;
+  font-size: 16px;
+}
+
+.toolkit-points-max {
+  font-size: 16px;
+  color: #7d4c21;
+}
+
+.toolkit-header-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.toolkit-lock-badge,
+.toolkit-practice-badge {
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.toolkit-lock-badge {
+  background: rgba(168, 50, 50, 0.12);
+  color: #a83232;
+  border: 1px solid rgba(168, 50, 50, 0.3);
+}
+
+.toolkit-practice-badge {
+  background: rgba(105, 137, 128, 0.15);
+  color: #4a6b62;
+  border: 1px solid rgba(105, 137, 128, 0.3);
+}
+
+.toolkit-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.toolkit-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 12px;
+  background: #fff8e7;
+  border: 1px solid rgba(196, 155, 98, 0.35);
+  border-radius: 8px;
+  transition: all 0.15s ease;
+}
+
+.toolkit-item:hover {
+  background: #fff4d9;
+  border-color: #c49b62;
+}
+
+.toolkit-item-main {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+}
+
+.toolkit-item-icon {
+  font-size: 22px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.toolkit-item-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.toolkit-item-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #314c53;
+}
+
+.toolkit-item-cost {
+  font-size: 11px;
+  color: #7d4c21;
+  background: rgba(196, 155, 98, 0.2);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 600;
+}
+
+.toolkit-item-desc {
+  font-size: 11px;
+  color: #6b5a45;
+  line-height: 1.4;
+}
+
+.toolkit-item-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  margin-left: 10px;
+}
+
+.toolkit-btn {
+  width: 28px;
+  height: 28px;
+  border: 2px solid #c49b62;
+  background: #fff4d9;
+  color: #7d4c21;
+  border-radius: 6px;
+  font-size: 16px;
+  font-weight: 800;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  transition: all 0.15s ease;
+  padding: 0;
+}
+
+.toolkit-btn:hover:not(:disabled) {
+  background: #698980;
+  color: #fff8e7;
+  border-color: #4a6b62;
+  transform: scale(1.05);
+}
+
+.toolkit-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  background: #f4e8d0;
+}
+
+.toolkit-item-count {
+  min-width: 24px;
+  text-align: center;
+  font-size: 15px;
+  font-weight: 800;
+  color: #314c53;
+}
+
+.toolkit-actions-row {
+  display: flex;
+  gap: 8px;
+}
+
+.toolkit-reset-btn,
+.toolkit-clear-btn {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid rgba(196, 155, 98, 0.4);
+  background: #fff8e7;
+  color: #5a4d35;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.toolkit-reset-btn:hover:not(:disabled),
+.toolkit-clear-btn:hover:not(:disabled) {
+  background: #ffe9c7;
+  border-color: #c49b62;
+  color: #314c53;
+}
+
+.toolkit-reset-btn:disabled,
+.toolkit-clear-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 .preview-actions {

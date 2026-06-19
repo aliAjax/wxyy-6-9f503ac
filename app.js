@@ -42,11 +42,14 @@ const closePreviewBtn = document.getElementById("closePreviewBtn");
 let currentPreviewTemplateId = null;
 let currentPreviewIsDaily = false;
 let currentPreviewDailyPractice = false;
+let currentPreviewToolkit = null;
+let selectedToolkit = null;
 
 const hintBtn = document.getElementById("hintBtn");
 const probeBtn = document.getElementById("probeBtn");
 const brushBtn = document.getElementById("brushBtn");
 const compassBtn = document.getElementById("compassBtn");
+const trowelBtn = document.getElementById("trowelBtn");
 const compassIndicator = document.getElementById("compassIndicator");
 const compassArrow = compassIndicator.querySelector(".compass-arrow");
 const compassDistance = compassIndicator.querySelector(".compass-distance");
@@ -282,6 +285,7 @@ const TOOLS = {
     name: "探针",
     icon: "📍",
     baseCount: 2,
+    cost: 2,
     description: "提示某片陶片所在的大致区域",
     canUse(state, template) {
       if (!state.running) return { ok: false, reason: "游戏未开始" };
@@ -327,6 +331,7 @@ const TOOLS = {
     name: "刷子",
     icon: "🖌️",
     baseCount: 3,
+    cost: 1,
     description: "安全清理一格，不触发随机事件",
     canUse(state, template) {
       if (!state.running) return { ok: false, reason: "游戏未开始" };
@@ -352,6 +357,7 @@ const TOOLS = {
     name: "罗盘",
     icon: "🧭",
     baseCount: 2,
+    cost: 3,
     description: "拖动陶片时显示距离正确槽位的方向",
     canUse(state, template) {
       if (!state.running) return { ok: false, reason: "游戏未开始" };
@@ -368,6 +374,32 @@ const TOOLS = {
       return {
         success: true,
         message: "罗盘已激活：拖动碎片时将显示指向正确位置的方向箭头。",
+        activateMode: true
+      };
+    }
+  },
+  trowel: {
+    id: "trowel",
+    name: "小手铲",
+    icon: "🔧",
+    baseCount: 2,
+    cost: 2,
+    description: "精确挖掘一格，若为空则返还1次刷子",
+    canUse(state, template) {
+      if (!state.running) return { ok: false, reason: "游戏未开始" };
+      if (state.tools.trowel <= 0) return { ok: false, reason: "小手铲已用完" };
+      const undug = [];
+      for (let i = 0; i < (template.gridSize || 25); i++) {
+        if (!state.dug.has(i) && !state.lockedCells.has(i)) undug.push(i);
+      }
+      if (undug.length === 0) return { ok: false, reason: "没有可挖掘的格子" };
+      return { ok: true };
+    },
+    use(state, template) {
+      state.activeTool = "trowel";
+      return {
+        success: true,
+        message: "小手铲模式：点击一格进行精确挖掘，不触发随机事件，空土返还刷子。",
         activateMode: true
       };
     }
@@ -397,13 +429,14 @@ const RESTORATION_GOALS = {
     id: "noTools",
     name: "纯手工修复",
     icon: "✋",
-    description: () => "不使用任何道具（探针、刷子、罗盘）",
+    description: () => "不使用任何道具（探针、刷子、罗盘、小手铲）",
     shortDescription: () => "不使用道具",
     checkValid: () => true,
     evaluate: (state) =>
       state.toolsUsed.probe === 0 &&
       state.toolsUsed.brush === 0 &&
-      state.toolsUsed.compass === 0
+      state.toolsUsed.compass === 0 &&
+      (state.toolsUsed.trowel === undefined || state.toolsUsed.trowel === 0)
   },
   timeLimit: {
     id: "timeLimit",
@@ -520,6 +553,7 @@ const artifactTemplates = {
       { id: "p3", label: "下左", slot: { x: 10, y: 53 }, angle: 180, initialAngle: 315 },
       { id: "p4", label: "下右", slot: { x: 51, y: 53 }, angle: 270, initialAngle: 45 }
     ],
+    toolPoints: 8,
     goals: {
       maxDigs: 12,
       timeLimit: 60,
@@ -580,6 +614,7 @@ const artifactTemplates = {
       { id: "p5", label: "左下", slot: { x: 5, y: 68 }, angle: 0, initialAngle: 270 },
       { id: "p6", label: "右下", slot: { x: 55, y: 68 }, angle: 90, initialAngle: 315 }
     ],
+    toolPoints: 12,
     goals: {
       maxDigs: 18,
       timeLimit: 90,
@@ -651,6 +686,7 @@ const artifactTemplates = {
       { id: "p8", label: "左上", slot: { x: 8, y: 15 }, angle: 315, initialAngle: 270 },
       { id: "p9", label: "中心", slot: { x: 33, y: 38 }, angle: 0, initialAngle: 180 }
     ],
+    toolPoints: 15,
     goals: {
       maxDigs: 25,
       timeLimit: 150,
@@ -823,7 +859,8 @@ function createRecordCard(record, showBadge = false) {
   if (record.toolsUsed !== undefined) {
     const toolStat = document.createElement("div");
     toolStat.className = "record-stat";
-    const totalTools = record.toolsUsed.probe + record.toolsUsed.brush + record.toolsUsed.compass;
+    const tu = record.toolsUsed;
+    const totalTools = (tu.probe || 0) + (tu.brush || 0) + (tu.compass || 0) + (tu.trowel || 0);
     toolStat.innerHTML = `<div class="record-stat-label">道具使用</div><div class="record-stat-value">${totalTools}次</div>`;
     stats.appendChild(toolStat);
   }
@@ -831,15 +868,35 @@ function createRecordCard(record, showBadge = false) {
   card.appendChild(header);
   card.appendChild(stats);
 
-  if (record.toolsUsed !== undefined && (record.toolsUsed.probe > 0 || record.toolsUsed.brush > 0 || record.toolsUsed.compass > 0)) {
-    const toolsDiv = document.createElement("div");
-    toolsDiv.className = "record-tools";
-    const toolList = [];
-    if (record.toolsUsed.probe > 0) toolList.push(`📍 探针×${record.toolsUsed.probe}`);
-    if (record.toolsUsed.brush > 0) toolList.push(`🖌️ 刷子×${record.toolsUsed.brush}`);
-    if (record.toolsUsed.compass > 0) toolList.push(`🧭 罗盘×${record.toolsUsed.compass}`);
-    toolsDiv.innerHTML = `<span class="record-tools-label">使用道具：</span>${toolList.join(" · ")}`;
-    card.appendChild(toolsDiv);
+  if (record.toolPackage) {
+    const tp = record.toolPackage;
+    const tpList = [];
+    if (tp.probe > 0) tpList.push(`📍探针×${tp.probe}`);
+    if (tp.brush > 0) tpList.push(`🖌️刷子×${tp.brush}`);
+    if (tp.compass > 0) tpList.push(`🧭罗盘×${tp.compass}`);
+    if (tp.trowel && tp.trowel > 0) tpList.push(`🔧小手铲×${tp.trowel}`);
+    if (tpList.length > 0) {
+      const pkgDiv = document.createElement("div");
+      pkgDiv.className = "record-toolkit";
+      pkgDiv.innerHTML = `<span class="record-toolkit-label">🎒 工具包：</span>${tpList.join(" · ")}`;
+      card.appendChild(pkgDiv);
+    }
+  }
+
+  if (record.toolsUsed !== undefined) {
+    const tu = record.toolsUsed;
+    const anyUsed = (tu.probe || 0) > 0 || (tu.brush || 0) > 0 || (tu.compass || 0) > 0 || (tu.trowel || 0) > 0;
+    if (anyUsed) {
+      const toolsDiv = document.createElement("div");
+      toolsDiv.className = "record-tools";
+      const toolList = [];
+      if (tu.probe > 0) toolList.push(`📍 探针×${tu.probe}`);
+      if (tu.brush > 0) toolList.push(`🖌️ 刷子×${tu.brush}`);
+      if (tu.compass > 0) toolList.push(`🧭 罗盘×${tu.compass}`);
+      if (tu.trowel > 0) toolList.push(`🔧 小手铲×${tu.trowel}`);
+      toolsDiv.innerHTML = `<span class="record-tools-label">使用道具：</span>${toolList.join(" · ")}`;
+      card.appendChild(toolsDiv);
+    }
   }
 
   if (record.keyEvents && record.keyEvents.length > 0) {
@@ -959,6 +1016,24 @@ function renderLevelCards() {
 
 function freshState() {
   const template = artifactTemplates[currentTemplate];
+  let toolkit = null;
+  if (selectedToolkit) {
+    toolkit = selectedToolkit;
+  } else if (template.toolCounts) {
+    toolkit = template.toolCounts;
+  } else if (template.toolPoints !== undefined) {
+    toolkit = getDefaultToolkit(template);
+  } else {
+    toolkit = {
+      probe: TOOLS.probe.baseCount,
+      brush: TOOLS.brush.baseCount,
+      compass: TOOLS.compass.baseCount,
+      trowel: TOOLS.trowel.baseCount
+    };
+  }
+  const toolsInit = { probe: 0, brush: 0, compass: 0, trowel: 0 };
+  Object.keys(toolkit).forEach(k => { toolsInit[k] = toolkit[k] || 0; });
+  const toolsUsedInit = { probe: 0, brush: 0, compass: 0, trowel: 0 };
   return {
     running: false,
     timeLeft: template.timeLimit,
@@ -977,19 +1052,12 @@ function freshState() {
     eventCooldowns: {},
     wrongAngleAttempts: 0,
     hintsUsed: 0,
-    tools: {
-      probe: TOOLS.probe.baseCount,
-      brush: TOOLS.brush.baseCount,
-      compass: TOOLS.compass.baseCount
-    },
-    toolsUsed: {
-      probe: 0,
-      brush: 0,
-      compass: 0
-    },
+    tools: toolsInit,
+    toolsUsed: toolsUsedInit,
     probeHints: new Set(),
     activeTool: null,
-    compassActive: false
+    compassActive: false,
+    toolPackage: { ...toolsInit }
   };
 }
 
@@ -1144,7 +1212,7 @@ function calculateExpertScore(template) {
   const positiveCount = state.triggeredEvents.filter(e => e.type === "positive").length;
   const eventScore = Math.round(Math.max(0, Math.min(100, 60 - negativeCount * 12 + positiveCount * 8)));
   const hintScore = state.hintsUsed === 0 ? 100 : Math.round(Math.max(0, 100 - state.hintsUsed * 30));
-  const toolPenalty = (state.toolsUsed.probe * 15) + (state.toolsUsed.brush * 10) + (state.toolsUsed.compass * 20);
+  const toolPenalty = (state.toolsUsed.probe * 15) + (state.toolsUsed.brush * 10) + (state.toolsUsed.compass * 20) + ((state.toolsUsed.trowel || 0) * 12);
   const toolScore = Math.round(Math.max(0, 100 - toolPenalty));
   const totalScore = Math.round((timeScore + digScore + angleScore + eventScore + hintScore + toolScore) / 6);
   return { timeScore, digScore, angleScore, eventScore, hintScore, toolScore, totalScore };
@@ -1440,12 +1508,14 @@ function init() {
   probeBtn.addEventListener("click", () => useTool("probe"));
   brushBtn.addEventListener("click", () => useTool("brush"));
   compassBtn.addEventListener("click", () => useTool("compass"));
+  trowelBtn.addEventListener("click", () => useTool("trowel"));
 
   document.addEventListener("keydown", (e) => {
     if (!state || !state.running) return;
     if (e.key === "1") useTool("probe");
     if (e.key === "2") useTool("brush");
     if (e.key === "3") useTool("compass");
+    if (e.key === "4") useTool("trowel");
     if (e.key === "Escape") cancelToolMode();
   });
 
@@ -1549,6 +1619,151 @@ function selectLevel(templateId, skipAutoTutorial = false) {
   }
 }
 
+function getDefaultToolkit(template) {
+  if (template.toolCounts) {
+    return { ...template.toolCounts };
+  }
+  const points = template.toolPoints || 10;
+  let remaining = points;
+  const toolkit = {};
+  const toolOrder = ["brush", "probe", "trowel", "compass"];
+  toolOrder.forEach(id => {
+    const tool = TOOLS[id];
+    const max = Math.floor(remaining / tool.cost);
+    const cnt = Math.min(tool.baseCount, max);
+    toolkit[id] = cnt;
+    remaining -= cnt * tool.cost;
+  });
+  toolkit.brush = (toolkit.brush || 0) + Math.floor(remaining / TOOLS.brush.cost);
+  return toolkit;
+}
+
+function calcToolkitCost(toolkit) {
+  let total = 0;
+  Object.keys(toolkit).forEach(id => {
+    const tool = TOOLS[id];
+    if (tool) total += (toolkit[id] || 0) * tool.cost;
+  });
+  return total;
+}
+
+function toolkitIsValid(toolkit, template) {
+  if (!template) return false;
+  const cost = calcToolkitCost(toolkit);
+  const maxPoints = template.toolPoints || 0;
+  return cost <= maxPoints;
+}
+
+function renderToolkitSelector(template, isLocked, isPractice) {
+  previewToolsEl.innerHTML = "";
+  const toolPoints = template.toolPoints || 0;
+  let toolkit;
+  if (template.toolCounts && (template.isDailyChallenge && !isPractice)) {
+    toolkit = { ...template.toolCounts };
+  } else {
+    toolkit = currentPreviewToolkit || getDefaultToolkit(template);
+  }
+  currentPreviewToolkit = toolkit;
+
+  const cost = calcToolkitCost(toolkit);
+  const header = document.createElement("div");
+  header.className = "toolkit-header";
+
+  const leftInfo = document.createElement("div");
+  leftInfo.className = "toolkit-header-info";
+  leftInfo.innerHTML = `<span class="toolkit-points-label">工具点数：</span>
+    <span class="toolkit-points-value ${cost > toolPoints && !isPractice ? 'over' : ''}">${cost}</span>
+    <span class="toolkit-points-sep">/</span>
+    <span class="toolkit-points-max">${toolPoints}</span>`;
+
+  const rightInfo = document.createElement("div");
+  rightInfo.className = "toolkit-header-status";
+  if (isLocked) {
+    rightInfo.innerHTML = `<span class="toolkit-lock-badge">🔒 固定配置</span>`;
+  } else if (isPractice) {
+    rightInfo.innerHTML = `<span class="toolkit-practice-badge">📝 练习模式</span>`;
+  }
+  header.appendChild(leftInfo);
+  header.appendChild(rightInfo);
+  previewToolsEl.appendChild(header);
+
+  const toolList = document.createElement("div");
+  toolList.className = "toolkit-list";
+
+  Object.keys(TOOLS).forEach(toolId => {
+    const tool = TOOLS[toolId];
+    const count = toolkit[toolId] || 0;
+    const item = document.createElement("div");
+    item.className = "toolkit-item";
+
+    const canInc = !isLocked && (isPractice || (cost + tool.cost) <= toolPoints);
+    const canDec = !isLocked && count > 0;
+
+    item.innerHTML = `
+      <div class="toolkit-item-main">
+        <span class="toolkit-item-icon">${tool.icon}</span>
+        <div class="toolkit-item-info">
+          <div class="toolkit-item-name">
+            <span>${tool.name}</span>
+            <span class="toolkit-item-cost" title="每次消耗点数">${tool.cost}点/个</span>
+          </div>
+          <div class="toolkit-item-desc">${tool.description}</div>
+        </div>
+      </div>
+      <div class="toolkit-item-controls">
+        <button type="button" class="toolkit-btn minus" data-tool="${toolId}" ${canDec ? '' : 'disabled'}>−</button>
+        <span class="toolkit-item-count">${count}</span>
+        <button type="button" class="toolkit-btn plus" data-tool="${toolId}" ${canInc ? '' : 'disabled'}>+</button>
+      </div>
+    `;
+    toolList.appendChild(item);
+  });
+  previewToolsEl.appendChild(toolList);
+
+  const resetRow = document.createElement("div");
+  resetRow.className = "toolkit-actions-row";
+  resetRow.innerHTML = `
+    <button type="button" class="toolkit-reset-btn" ${isLocked ? 'disabled' : ''}>↺ 恢复默认</button>
+    <button type="button" class="toolkit-clear-btn" ${isLocked ? 'disabled' : ''}>✕ 清空全部</button>
+  `;
+  previewToolsEl.appendChild(resetRow);
+
+  previewToolsEl.querySelectorAll(".toolkit-btn.plus").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const tid = btn.dataset.tool;
+      const tk = currentPreviewToolkit || getDefaultToolkit(template);
+      tk[tid] = (tk[tid] || 0) + 1;
+      currentPreviewToolkit = tk;
+      renderToolkitSelector(template, isLocked, isPractice);
+    });
+  });
+  previewToolsEl.querySelectorAll(".toolkit-btn.minus").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const tid = btn.dataset.tool;
+      const tk = currentPreviewToolkit || getDefaultToolkit(template);
+      if ((tk[tid] || 0) > 0) {
+        tk[tid] = tk[tid] - 1;
+        currentPreviewToolkit = tk;
+        renderToolkitSelector(template, isLocked, isPractice);
+      }
+    });
+  });
+  const resetBtn = previewToolsEl.querySelector(".toolkit-reset-btn");
+  if (resetBtn) {
+    resetBtn.addEventListener("click", () => {
+      currentPreviewToolkit = getDefaultToolkit(template);
+      renderToolkitSelector(template, isLocked, isPractice);
+    });
+  }
+  const clearBtn = previewToolsEl.querySelector(".toolkit-clear-btn");
+  if (clearBtn) {
+    clearBtn.addEventListener("click", () => {
+      currentPreviewToolkit = { probe: 0, brush: 0, compass: 0, trowel: 0 };
+      renderToolkitSelector(template, isLocked, isPractice);
+    });
+  }
+}
+
 function showLevelPreview(templateId, isDaily = false, isPractice = false) {
   const template = artifactTemplates[templateId];
   if (!template) return;
@@ -1556,6 +1771,7 @@ function showLevelPreview(templateId, isDaily = false, isPractice = false) {
   currentPreviewTemplateId = templateId;
   currentPreviewIsDaily = isDaily;
   currentPreviewDailyPractice = isPractice;
+  currentPreviewToolkit = null;
 
   previewIconEl.className = `preview-icon level-icon ${template.iconClass || "custom-icon"}`;
 
@@ -1576,30 +1792,8 @@ function showLevelPreview(templateId, isDaily = false, isPractice = false) {
     previewBestScoreEl.textContent = "暂无记录";
   }
 
-  previewToolsEl.innerHTML = "";
-  const toolCounts = template.toolCounts || {
-    probe: TOOLS.probe.baseCount,
-    brush: TOOLS.brush.baseCount,
-    compass: TOOLS.compass.baseCount
-  };
-  const toolsList = [
-    { id: "probe", ...TOOLS.probe, count: toolCounts.probe },
-    { id: "brush", ...TOOLS.brush, count: toolCounts.brush },
-    { id: "compass", ...TOOLS.compass, count: toolCounts.compass }
-  ];
-  toolsList.forEach(tool => {
-    const toolEl = document.createElement("div");
-    toolEl.className = "preview-tool";
-    toolEl.innerHTML = `
-      <span class="preview-tool-icon">${tool.icon}</span>
-      <div class="preview-tool-info">
-        <span class="preview-tool-name">${tool.name}</span>
-        <span class="preview-tool-count">×${tool.count}</span>
-      </div>
-    `;
-    toolEl.title = tool.description;
-    previewToolsEl.appendChild(toolEl);
-  });
+  const isLocked = isDaily && !isPractice;
+  renderToolkitSelector(template, isLocked, isPractice);
 
   const previewGoalsSection = document.getElementById("previewGoalsSection");
   const previewGoalsEl = document.getElementById("previewGoals");
@@ -1638,10 +1832,12 @@ function hideLevelPreview() {
   currentPreviewTemplateId = null;
   currentPreviewIsDaily = false;
   currentPreviewDailyPractice = false;
+  currentPreviewToolkit = null;
 }
 
 function startFromPreview() {
   if (!currentPreviewTemplateId) return;
+  selectedToolkit = currentPreviewToolkit ? { ...currentPreviewToolkit } : null;
 
   if (currentPreviewIsDaily) {
     startDailyChallenge(currentPreviewDailyPractice);
@@ -1702,6 +1898,10 @@ function dig(index) {
 
   if (state.activeTool === "brush") {
     brushDig(index);
+    return;
+  }
+  if (state.activeTool === "trowel") {
+    trowelDig(index);
     return;
   }
 
@@ -1825,6 +2025,9 @@ function cancelToolMode(renderLog = true) {
     state.compassActive = false;
     compassIndicator.classList.add("hidden");
     if (renderLog) addLog("已关闭罗盘。");
+  } else if (state.activeTool === "trowel" && state.tools.trowel > 0) {
+    state.activeTool = null;
+    if (renderLog) addLog("已取消小手铲模式。");
   } else {
     state.activeTool = null;
   }
@@ -1849,6 +2052,29 @@ function brushDig(index) {
     tutorial.notifyAction("dig");
   } else {
     addLog("[刷子] 安全清理，这一格只有松土和碎砂。");
+  }
+
+  render();
+}
+
+function trowelDig(index) {
+  if (!state.running || state.dug.has(index) || state.lockedCells.has(index)) return;
+  const template = artifactTemplates[currentTemplate];
+
+  state.dug.add(index);
+  state.tools.trowel -= 1;
+  state.toolsUsed.trowel += 1;
+  state.activeTool = null;
+
+  if (template.buried[index]) {
+    const id = template.buried[index];
+    state.found.add(id);
+    addLog(`[小手铲] 精确挖掘出${template.pieceDefs.find((p) => p.id === id).label}${template.pieceName}！`);
+    spawnPiece(id);
+    tutorial.notifyAction("dig");
+  } else {
+    addLog("[小手铲] 精确挖掘落空，这一格只有松土，返还1次刷子。");
+    state.tools.brush = (state.tools.brush || 0) + 1;
   }
 
   render();
@@ -2389,6 +2615,7 @@ function finish(success, message) {
           <span class="tool-used-item">📍 探针 ${state.toolsUsed.probe}</span>
           <span class="tool-used-item">🖌️ 刷子 ${state.toolsUsed.brush}</span>
           <span class="tool-used-item">🧭 罗盘 ${state.toolsUsed.compass}</span>
+          <span class="tool-used-item">🔧 小手铲 ${state.toolsUsed.trowel || 0}</span>
         </div>
         <div class="settlement-commentary">${commentary}</div>
       </div>`;
@@ -2408,6 +2635,7 @@ function finish(success, message) {
       hintsUsed: state.hintsUsed,
       wrongAngleAttempts: state.wrongAngleAttempts,
       toolsUsed: { ...state.toolsUsed },
+      toolPackage: state.toolPackage ? { ...state.toolPackage } : null,
       goals: goalResults,
       goalsAchieved: achievedGoalsCount,
       goalsTotal: goalsCount,
@@ -2462,6 +2690,7 @@ function finish(success, message) {
           <span class="tool-used-item">📍 探针 ${state.toolsUsed.probe}</span>
           <span class="tool-used-item">🖌️ 刷子 ${state.toolsUsed.brush}</span>
           <span class="tool-used-item">🧭 罗盘 ${state.toolsUsed.compass}</span>
+          <span class="tool-used-item">🔧 小手铲 ${state.toolsUsed.trowel || 0}</span>
         </div>
         <div class="settlement-commentary">修复未能完成，考古现场需更严谨的操作与更充分的准备。</div>
       </div>`;
@@ -2558,18 +2787,27 @@ function renderGoals() {
 
 function renderTools() {
   const template = artifactTemplates[currentTemplate];
+  const allBtns = [probeBtn, brushBtn, compassBtn, trowelBtn];
+  allBtns.forEach(b => b.classList.add("hidden"));
 
   function renderToolButton(btnEl, toolId) {
+    const count = state.tools[toolId] || 0;
+    if (count <= 0 && state.activeTool !== toolId) {
+      btnEl.classList.add("hidden");
+      return;
+    }
     const tool = TOOLS[toolId];
+    if (!tool) return;
+    btnEl.classList.remove("hidden");
     const check = tool.canUse(state, template);
     const isActive = state.activeTool === toolId;
 
     btnEl.innerHTML = `
       <span class="tool-icon">${tool.icon}</span>
       <span class="tool-name">${tool.name}</span>
-      <span class="tool-count">${state.tools[toolId]}</span>
+      <span class="tool-count">${count}</span>
     `;
-    btnEl.title = `${tool.name}：${tool.description}（剩余${state.tools[toolId]}次）`;
+    btnEl.title = `${tool.name}：${tool.description}（剩余${count}次）`;
     btnEl.disabled = !check.ok && !isActive;
     btnEl.classList.toggle("active", isActive);
   }
@@ -2577,6 +2815,7 @@ function renderTools() {
   renderToolButton(probeBtn, "probe");
   renderToolButton(brushBtn, "brush");
   renderToolButton(compassBtn, "compass");
+  renderToolButton(trowelBtn, "trowel");
 }
 
 function renderGrid() {
@@ -2586,6 +2825,7 @@ function renderGrid() {
   const cols = Math.sqrt(gridSize);
   gridEl.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
   gridEl.classList.toggle("brush-mode", state.activeTool === "brush");
+  gridEl.classList.toggle("trowel-mode", state.activeTool === "trowel");
 
   for (let i = 0; i < gridSize; i += 1) {
     const cell = document.createElement("button");
@@ -2597,6 +2837,7 @@ function renderGrid() {
     if (state.hintedCells.has(i) && !state.dug.has(i)) cell.classList.add("hinted");
     if (state.probeHints.has(i) && !state.dug.has(i)) cell.classList.add("probe-hinted");
     if (state.activeTool === "brush") cell.classList.add("brush-mode");
+    if (state.activeTool === "trowel") cell.classList.add("trowel-mode");
 
     if (state.dug.has(i)) {
       cell.textContent = template.buried[i] ? template.pieceName : "土";
@@ -3910,8 +4151,10 @@ function generateDailyChallenge(dateStr) {
   const toolCounts = {
     probe: Math.max(1, TOOLS.probe.baseCount + Math.floor(rng() * 3) - 1),
     brush: Math.max(1, TOOLS.brush.baseCount + Math.floor(rng() * 3) - 1),
-    compass: Math.max(0, TOOLS.compass.baseCount + Math.floor(rng() * 2) - 1)
+    compass: Math.max(0, TOOLS.compass.baseCount + Math.floor(rng() * 2) - 1),
+    trowel: Math.max(0, TOOLS.trowel.baseCount + Math.floor(rng() * 3) - 1)
   };
+  const toolPoints = calcToolkitCost(toolCounts);
 
   const timeModifier = 0.85 + rng() * 0.3;
   const timeLimit = Math.round(baseTemplate.timeLimit * timeModifier);
@@ -3936,6 +4179,7 @@ function generateDailyChallenge(dateStr) {
     date: dateStr,
     eventModifiers: eventModifiers,
     toolCounts: toolCounts,
+    toolPoints: toolPoints,
     targetScore: targetScore,
     targetRating: targetRating
   };
@@ -4084,16 +4328,16 @@ function startDailyChallenge(practice) {
 
 const _origFreshStateDaily = freshState;
 freshState = function() {
-  const state = _origFreshStateDaily();
   const template = artifactTemplates[currentTemplate];
-
-  if (template && template.isDailyChallenge) {
-    if (template.toolCounts) {
-      state.tools = { ...template.toolCounts };
-    }
+  if (template && template.isDailyChallenge && !isPracticeMode && template.toolCounts) {
+    const savedToolkit = selectedToolkit;
+    selectedToolkit = template.toolCounts;
+    const state = _origFreshStateDaily();
+    selectedToolkit = savedToolkit;
+    state.toolPackage = { ...template.toolCounts };
+    return state;
   }
-
-  return state;
+  return _origFreshStateDaily();
 };
 
 const _origTryTriggerEventDaily = tryTriggerEvent;
