@@ -3493,9 +3493,23 @@ tryTriggerEvent = function() {
     if (Math.random() < prob) {
       const result = evt.apply(state, template);
       if (result && result.success) {
-        state.triggeredEvents.push({ ...evt, message: result.message });
+        state.triggeredEvents.push({
+          id: evt.id,
+          name: evt.name,
+          type: evt.type,
+          message: result.message,
+          timestamp: Date.now()
+        });
         if (evt.key) {
-          state.keyEvents.push({ ...evt, message: result.message });
+          state.keyEvents.push({
+            id: evt.id,
+            name: evt.name,
+            type: evt.type,
+            message: result.message
+          });
+        }
+        if (!result.silent) {
+          addLog(result.message);
         }
         state.eventCooldowns[evt.id] = evt.cooldown;
 
@@ -3564,18 +3578,72 @@ finish = function(success, message) {
 
     const todayRecord = dailyChallengeStore.getRecord(dateStr);
     const streak = dailyChallengeStore.getStreak();
+    const targetScore = template.targetScore || 0;
+    const targetRating = template.targetRating || "C";
+    const scores = calculateExpertScore(template);
+    const finalScore = scores.totalScore;
+    const finalRating = getRating(finalScore);
+    const scoreDiff = finalScore - targetScore;
+    const reachedTarget = finalScore >= targetScore;
+    const targetPercent = Math.min(100, Math.round((finalScore / targetScore) * 100));
 
+    let targetHtml = `
+      <div class="daily-target-section">
+        <div class="daily-target-header">
+          <span class="target-label">🎯 今日目标</span>
+          <span class="target-rating-badge target-rating-${targetRating}">${targetRating}级 · ${targetScore}分</span>
+        </div>
+        <div class="daily-target-progress">
+          <div class="target-progress-bar">
+            <div class="target-progress-fill ${reachedTarget ? 'reached' : ''}" style="width:${targetPercent}%"></div>
+            <div class="target-progress-marker" style="left:100%"></div>
+          </div>
+          <div class="target-score-row">
+            <span class="current-score">
+              <span class="score-num">${finalScore}</span>
+              <span class="score-label">本次得分</span>
+            </span>
+            <span class="target-score">
+              <span class="score-num">${targetScore}</span>
+              <span class="score-label">目标分数</span>
+            </span>
+          </div>
+        </div>
+        <div class="daily-target-result">
+    `;
+
+    if (reachedTarget) {
+      targetHtml += `
+          <div class="target-reached">
+            <span class="target-reached-icon">🎉</span>
+            <span class="target-reached-text">目标达成！${scoreDiff > 0 ? `超出 ${scoreDiff} 分` : '刚好达成'}</span>
+          </div>
+      `;
+    } else {
+      targetHtml += `
+          <div class="target-not-reached">
+            <span class="target-not-reached-icon">💪</span>
+            <span class="target-not-reached-text">还差 ${Math.abs(scoreDiff)} 分达成目标</span>
+          </div>
+      `;
+    }
+
+    targetHtml += `</div></div>`;
+
+    let modeHtml = "";
     if (isPracticeMode) {
-      challengeInfo.innerHTML = `
+      modeHtml = `
         <div class="practice-badge">📝 练习模式</div>
         <p class="practice-note">本次为练习，不计入每日挑战成绩。</p>
       `;
     } else if (todayRecord && todayRecord.completed) {
-      challengeInfo.innerHTML = `
+      modeHtml = `
         <div class="streak-info">🔥 连续完成 <strong>${streak}</strong> 天</div>
         <p class="completed-note">今日挑战已完成！明天再来挑战吧。</p>
       `;
     }
+
+    challengeInfo.innerHTML = modeHtml + targetHtml;
 
     resultSection.insertBefore(challengeInfo, resultSection.firstChild);
   }
