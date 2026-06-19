@@ -1379,10 +1379,15 @@ function showLevelPreview(templateId, isDaily = false, isPractice = false) {
   }
 
   previewToolsEl.innerHTML = "";
+  const toolCounts = template.toolCounts || {
+    probe: TOOLS.probe.baseCount,
+    brush: TOOLS.brush.baseCount,
+    compass: TOOLS.compass.baseCount
+  };
   const toolsList = [
-    { id: "probe", ...TOOLS.probe, count: TOOLS.probe.baseCount },
-    { id: "brush", ...TOOLS.brush, count: TOOLS.brush.baseCount },
-    { id: "compass", ...TOOLS.compass, count: TOOLS.compass.baseCount }
+    { id: "probe", ...TOOLS.probe, count: toolCounts.probe },
+    { id: "brush", ...TOOLS.brush, count: toolCounts.brush },
+    { id: "compass", ...TOOLS.compass, count: toolCounts.compass }
   ];
   toolsList.forEach(tool => {
     const toolEl = document.createElement("div");
