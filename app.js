@@ -111,11 +111,13 @@ const SEEDED_RANDOM = {
     this._seed = (this._seed * 1664525 + 1013904223) >>> 0;
     return (this._seed & 0xffffffff) / 0x100000000;
   },
-  range(min, max) {
-    return min + this.next() * (max - min);
+  range(min, max) { return min + this.next() * (max - min); },
+  int(min, max) { return Math.floor(this.range(min, max + 1)); },
+  getState() {
+    return this._seed;
   },
-  int(min, max) {
-    return Math.floor(this.range(min, max + 1));
+  setState(state) {
+    this._seed = state >>> 0;
   }
 };
 
@@ -155,7 +157,8 @@ const timelineRecorder = {
       timestamp: this._getTimeOffset(),
       index: this._events.length,
       data: data || {},
-      description: description || ""
+      description: description || "",
+      _seedState: SEEDED_RANDOM.getState()
     };
     this._events.push(event);
     return event;
@@ -178,12 +181,13 @@ const timelineRecorder = {
     }, `${TOOL_NAMES[toolId]?.icon || '🔧'} 使用${TOOL_NAMES[toolId]?.name || toolId}`);
   },
 
-  recordEventTrigger(eventId, eventName, eventType, message) {
+  recordEventTrigger(eventId, eventName, eventType, message, effect) {
     return this.record(TIMELINE_EVENT_TYPES.EVENT_TRIGGER, {
       eventId,
       eventName,
       eventType,
-      message
+      message,
+      effect: effect || {}
     }, `${eventType === 'positive' ? '✨' : '⚡'} ${eventName}`);
   },
 
@@ -301,6 +305,45 @@ const playbackManager = {
     document.querySelectorAll(".playback-tab-panel").forEach(panel => {
       panel.classList.toggle("active", panel.id === `playback${tabName.charAt(0).toUpperCase() + tabName.slice(1)}Tab`);
     });
+  },
+
+  _parsePosition(position) {
+    if (!position) return { left: 0, top: 0, x: 0, y: 0 };
+    let left = 0, top = 0;
+    if (typeof position.left === "string") {
+      left = parseFloat(position.left) || 0;
+    } else if (typeof position.left === "number") {
+      left = position.left;
+    }
+    if (typeof position.top === "string") {
+      top = parseFloat(position.top) || 0;
+    } else if (typeof position.top === "number") {
+      top = position.top;
+    }
+    if (typeof position.x === "number") {
+      left = position.x;
+    }
+    if (typeof position.y === "number") {
+      top = position.y;
+    }
+    return { left, top, x: left, y: top };
+  },
+
+  _applySeedState(event) {
+    if (event && event._seedState !== undefined) {
+      SEEDED_RANDOM.setState(event._seedState);
+    }
+  },
+
+  _restoreSeedToStep(stepIndex) {
+    if (stepIndex < 0) {
+      SEEDED_RANDOM.init(this._timeline.seed);
+      return;
+    }
+    const event = this._timeline.events[stepIndex];
+    if (event && event._seedState !== undefined) {
+      SEEDED_RANDOM.setState(event._seedState);
+    }
   },
 
   open(record) {
@@ -574,6 +617,13 @@ const playbackManager = {
   _applyEvent(event, isForward = true) {
     if (!event || !this._playbackState) return;
 
+    if (isForward) {
+      this._applySeedState(event);
+    } else {
+      const prevEventIndex = event.index > 0 ? event.index - 1 : -1;
+      this._restoreSeedToStep(prevEventIndex);
+    }
+
     switch (event.type) {
       case TIMELINE_EVENT_TYPES.DIG:
         this._applyDigEvent(event, isForward);
@@ -641,22 +691,20 @@ const playbackManager = {
   },
 
   _applyEventTriggerEvent(event, isForward) {
-    const { eventId, eventType } = event.data;
-    const evt = SITE_EVENTS[eventId];
-    if (!evt) return;
+    const { eventId, eventType, effect } = event.data;
 
-    if (isForward) {
-      const template = this._template;
-      const state = {
-        ...this._playbackState,
-        triggeredEvents: [],
-        keyEvents: []
-      };
-      const result = evt.apply(state, template);
-      if (result && result.success) {
-        this._playbackState.lockedCells = state.lockedCells;
-        this._updateGridCells();
+    if (isForward && effect) {
+      if (effect.addedLockedCells && effect.addedLockedCells.length) {
+        effect.addedLockedCells.forEach(cellIdx => {
+          this._playbackState.lockedCells.add(cellIdx);
+        });
       }
+      if (effect.addedHintedCells && effect.addedHintedCells.length) {
+        effect.addedHintedCells.forEach(cellIdx => {
+          this._playbackState.hintedCells.add(cellIdx);
+        });
+      }
+      this._updateGridCells();
     }
   },
 
@@ -667,7 +715,7 @@ const playbackManager = {
 
     if (isForward) {
       piece.spawned = true;
-      piece.position = position;
+      piece.position = this._parsePosition(position);
       this._playbackState.found.add(pieceId);
       this._renderPieceElement(pieceId, true);
     } else {
@@ -684,7 +732,8 @@ const playbackManager = {
     const pieceEl = document.querySelector(`.playback-piece[data-id="${pieceId}"]`);
     if (!piece || !pieceEl) return;
 
-    const targetPos = isForward ? toPosition : fromPosition;
+    const rawTargetPos = isForward ? toPosition : fromPosition;
+    const targetPos = this._parsePosition(rawTargetPos);
     piece.position = targetPos;
     pieceEl.style.left = `${targetPos.x}px`;
     pieceEl.style.top = `${targetPos.y}px`;
@@ -713,11 +762,12 @@ const playbackManager = {
 
     if (isForward && success) {
       piece.locked = true;
-      piece.position = position;
+      const parsedPos = this._parsePosition(position);
+      piece.position = parsedPos;
       this._playbackState.locked.add(pieceId);
       if (pieceEl) {
-        pieceEl.style.left = `${position.x}px`;
-        pieceEl.style.top = `${position.y}px`;
+        pieceEl.style.left = `${parsedPos.x}px`;
+        pieceEl.style.top = `${parsedPos.y}px`;
         pieceEl.classList.add("locked");
         pieceEl.classList.add("active");
       }
@@ -777,8 +827,9 @@ const playbackManager = {
     }
 
     if (piece.position) {
-      pieceEl.style.left = `${piece.position.x}px`;
-      pieceEl.style.top = `${piece.position.y}px`;
+      const pos = this._parsePosition(piece.position);
+      pieceEl.style.left = `${pos.x}px`;
+      pieceEl.style.top = `${pos.y}px`;
     }
 
     pieceEl.style.setProperty("--angle", `${piece.angle}deg`);
@@ -801,6 +852,7 @@ const playbackManager = {
     if (stepIndex < this._currentStep) {
       this._initPlaybackState();
       this._renderPlaybackStage();
+      this._restoreSeedToStep(-1);
       this._currentStep = -1;
     }
 
@@ -886,6 +938,7 @@ const playbackManager = {
     this._currentStep = -1;
     this._initPlaybackState();
     this._renderPlaybackStage();
+    this._restoreSeedToStep(-1);
     this._updateControls();
   },
 
@@ -970,7 +1023,7 @@ const SITE_EVENTS = {
         const actualLock = [];
         for (let i = 0; i < lockCount; i++) {
           if (lockable.length === 0) break;
-          const idx = Math.floor(Math.random() * lockable.length);
+          const idx = SEEDED_RANDOM.int(0, lockable.length - 1);
           actualLock.push(lockable.splice(idx, 1)[0]);
         }
         actualLock.forEach((i) => state.lockedCells.add(i));
@@ -1017,7 +1070,7 @@ const SITE_EVENTS = {
         (i) => !state.dug.has(i) && !state.hintedCells.has(i)
       );
       if (hiddenPieces.length > 0) {
-        const targetIdx = hiddenPieces[Math.floor(Math.random() * hiddenPieces.length)];
+        const targetIdx = hiddenPieces[SEEDED_RANDOM.int(0, hiddenPieces.length - 1)];
         state.hintedCells.add(targetIdx);
         const def = template.pieceDefs.find((p) => p.id === template.buried[targetIdx]);
         return {
@@ -1117,7 +1170,7 @@ const TOOLS = {
     use(state, template) {
       const pieceIndices = Object.keys(template.buried).map(Number);
       const hidden = pieceIndices.filter(i => !state.dug.has(i) && !state.probeHints.has(i));
-      const targetIdx = hidden[Math.floor(Math.random() * hidden.length)];
+      const targetIdx = hidden[SEEDED_RANDOM.int(0, hidden.length - 1)];
       const cols = Math.sqrt(template.gridSize || 25);
       const row = Math.floor(targetIdx / cols);
       const col = targetIdx % cols;
@@ -2359,8 +2412,25 @@ function tryTriggerEvent() {
 
   for (const evt of availableEvents) {
     if (SEEDED_RANDOM.next() < evt.probability) {
+      const before = {
+        lockedCells: new Set(state.lockedCells),
+        hintedCells: new Set(state.hintedCells),
+        toolWear: state.toolWear,
+        bonusScore: state.bonusScore,
+        probeHints: new Set(state.probeHints)
+      };
       const result = evt.apply(state, template);
       if (result.success) {
+        const effect = {};
+        const addedLocked = [...state.lockedCells].filter(x => !before.lockedCells.has(x));
+        const addedHinted = [...state.hintedCells].filter(x => !before.hintedCells.has(x));
+        const addedProbeHints = [...state.probeHints].filter(x => !before.probeHints.has(x));
+        if (addedLocked.length) effect.addedLockedCells = addedLocked;
+        if (addedHinted.length) effect.addedHintedCells = addedHinted;
+        if (addedProbeHints.length) effect.addedProbeHints = addedProbeHints;
+        if (state.toolWear !== before.toolWear) effect.toolWearDelta = state.toolWear - before.toolWear;
+        if (state.bonusScore !== before.bonusScore) effect.bonusScoreDelta = state.bonusScore - before.bonusScore;
+
         state.triggeredEvents.push({
           id: evt.id,
           name: evt.name,
@@ -2383,7 +2453,7 @@ function tryTriggerEvent() {
           showEventNotif(evt, result.message);
         }
 
-        timelineRecorder.recordEventTrigger(evt.id, evt.name, evt.type, result.message);
+        timelineRecorder.recordEventTrigger(evt.id, evt.name, evt.type, result.message, effect);
 
         state.eventCooldowns[evt.id] = evt.cooldown;
 
@@ -6310,9 +6380,26 @@ tryTriggerEvent = function() {
 
   for (const evt of availableEvents) {
     const prob = template.eventModifiers[evt.id] || evt.probability;
-    if (Math.random() < prob) {
+    if (SEEDED_RANDOM.next() < prob) {
+      const before = {
+        lockedCells: new Set(state.lockedCells),
+        hintedCells: new Set(state.hintedCells),
+        toolWear: state.toolWear,
+        bonusScore: state.bonusScore,
+        probeHints: new Set(state.probeHints)
+      };
       const result = evt.apply(state, template);
       if (result && result.success) {
+        const effect = {};
+        const addedLocked = [...state.lockedCells].filter(x => !before.lockedCells.has(x));
+        const addedHinted = [...state.hintedCells].filter(x => !before.hintedCells.has(x));
+        const addedProbeHints = [...state.probeHints].filter(x => !before.probeHints.has(x));
+        if (addedLocked.length) effect.addedLockedCells = addedLocked;
+        if (addedHinted.length) effect.addedHintedCells = addedHinted;
+        if (addedProbeHints.length) effect.addedProbeHints = addedProbeHints;
+        if (state.toolWear !== before.toolWear) effect.toolWearDelta = state.toolWear - before.toolWear;
+        if (state.bonusScore !== before.bonusScore) effect.bonusScoreDelta = state.bonusScore - before.bonusScore;
+
         state.triggeredEvents.push({
           id: evt.id,
           name: evt.name,
@@ -6332,6 +6419,9 @@ tryTriggerEvent = function() {
           addLog(result.message);
           showEventNotif(evt, result.message);
         }
+
+        timelineRecorder.recordEventTrigger(evt.id, evt.name, evt.type, result.message, effect);
+
         state.eventCooldowns[evt.id] = evt.cooldown;
 
         Object.keys(state.eventCooldowns).forEach((id) => {
