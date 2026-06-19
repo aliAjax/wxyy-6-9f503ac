@@ -2642,23 +2642,31 @@ const editor = {
     return copyName;
   },
 
+  persistCopiedState(sourceState) {
+    const copiedState = JSON.parse(JSON.stringify(sourceState));
+    copiedState.name = this.generateCopyName(copiedState.name);
+    delete copiedState.id;
+    delete copiedState.createdAt;
+    delete copiedState.updatedAt;
+    const savedLevel = customLevelsStore.add(this.stateToTemplate(copiedState));
+    this.state = this.templateToEditorState(savedLevel);
+    this.editingLevelId = savedLevel.id;
+    this.selectedPieceId = this.state.pieceDefs.length > 0 ? this.state.pieceDefs[0].id : null;
+    renderCustomLevelCards();
+    return savedLevel;
+  },
+
   duplicate() {
     if (!this.state) {
       alert("当前没有可复制的关卡配置");
       return;
     }
-    const copiedState = JSON.parse(JSON.stringify(this.state));
-    copiedState.name = this.generateCopyName(copiedState.name);
-    delete copiedState.id;
-    delete copiedState.createdAt;
-    delete copiedState.updatedAt;
-    this.state = copiedState;
-    this.editingLevelId = null;
+    const savedLevel = this.persistCopiedState(this.state);
     this.syncUIFromState();
     this.renderAll();
     document.getElementById("validationResult").className = "validation-result success";
     document.getElementById("validationResult").innerHTML =
-      `<strong>✅ 已复制为新关卡</strong> 名称已更新为「${this.state.name}」，可继续编辑后保存。`;
+      `<strong>✅ 已复制为新关卡</strong> 名称已更新为「${savedLevel.name}」，可继续编辑碎片、埋藏位置和修复槽位。`;
   },
 
   copyFromPreview() {
@@ -2668,11 +2676,7 @@ const editor = {
     }
     const template = artifactTemplates[currentPreviewTemplateId];
     const editorState = this.templateToEditorState(template);
-    editorState.name = this.generateCopyName(editorState.name);
-    delete editorState.id;
-    this.state = editorState;
-    this.editingLevelId = null;
-    this.selectedPieceId = this.state.pieceDefs.length > 0 ? this.state.pieceDefs[0].id : null;
+    const savedLevel = this.persistCopiedState(editorState);
     hideLevelPreview();
     this.syncUIFromState();
     this.renderAll();
@@ -2680,7 +2684,7 @@ const editor = {
     document.getElementById("levelEditor").classList.remove("hidden");
     document.getElementById("validationResult").className = "validation-result success";
     document.getElementById("validationResult").innerHTML =
-      `<strong>✅ 已复制为自定义关卡</strong> 名称：「${this.state.name}」，可编辑碎片、埋藏位置和修复槽位后保存。`;
+      `<strong>✅ 已复制为自定义关卡</strong> 名称：「${savedLevel.name}」，可继续编辑碎片、埋藏位置和修复槽位。`;
   },
 
   close() {
@@ -3124,7 +3128,11 @@ const editor = {
   },
 
   buildTemplate() {
-    const preset = STYLE_PRESETS[this.state.stylePreset || "bowl"];
+    return this.stateToTemplate(this.state);
+  },
+
+  stateToTemplate(state) {
+    const preset = STYLE_PRESETS[state.stylePreset || "bowl"];
     const iconClassMap = {
       bowl: "bowl-icon",
       tile: "tile-icon",
@@ -3133,16 +3141,16 @@ const editor = {
     };
 
     return {
-      id: this.state.id || ("custom_" + Date.now()),
+      id: state.id || ("custom_" + Date.now()),
       isCustom: true,
-      name: this.state.name || "自定义关卡",
-      pieceName: this.state.pieceName || "碎片",
-      description: this.state.description || "",
-      timeLimit: this.state.timeLimit || 120,
+      name: state.name || "自定义关卡",
+      pieceName: state.pieceName || "碎片",
+      description: state.description || "",
+      timeLimit: state.timeLimit || 120,
       difficulty: "自定义",
-      snapRadius: this.state.snapRadius || 60,
-      gridSize: this.state.gridSize || 25,
-      iconClass: iconClassMap[this.state.stylePreset] || "custom-icon",
+      snapRadius: state.snapRadius || 60,
+      gridSize: state.gridSize || 25,
+      iconClass: iconClassMap[state.stylePreset] || "custom-icon",
       target: {
         shape: preset.shape,
         style: preset.target
@@ -3150,8 +3158,8 @@ const editor = {
       piece: {
         style: preset.piece
       },
-      buried: JSON.parse(JSON.stringify(this.state.buried)),
-      pieceDefs: JSON.parse(JSON.stringify(this.state.pieceDefs))
+      buried: JSON.parse(JSON.stringify(state.buried)),
+      pieceDefs: JSON.parse(JSON.stringify(state.pieceDefs))
     };
   },
 
