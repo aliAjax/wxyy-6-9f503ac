@@ -3070,6 +3070,7 @@ const editor = {
   draggingSlotId: null,
   dragOffset: { x: 0, y: 0 },
   editingLevelId: null,
+  _pendingImportState: null,
 
   init() {
     this.bindUI();
@@ -3089,6 +3090,9 @@ const editor = {
       document.getElementById("importFileInput").click();
     });
     document.getElementById("importFileInput").addEventListener("change", (e) => this.importJSON(e));
+    document.getElementById("importPreviewCloseBtn").addEventListener("click", () => this.hideImportPreview());
+    document.getElementById("importPreviewCancelBtn").addEventListener("click", () => this.hideImportPreview());
+    document.getElementById("importPreviewConfirmBtn").addEventListener("click", () => this.applyImportedData());
     document.getElementById("previewCopyBtn").addEventListener("click", () => this.copyFromPreview());
 
     document.getElementById("editorLevelName").addEventListener("input", (e) => {
@@ -3913,32 +3917,210 @@ const editor = {
       try {
         const data = JSON.parse(ev.target.result);
         if (!data.pieceDefs || !data.buried) {
-          throw new Error("无效的关卡文件格式");
+          throw new Error("无效的关卡文件格式：缺少 pieceDefs 或 buried 字段");
         }
-        this.state = {
-          isCustom: true,
-          id: data.id,
-          name: data.name || "",
-          description: data.description || "",
-          timeLimit: data.timeLimit || 120,
-          gridSize: data.gridSize || 25,
-          pieceName: data.pieceName || "碎片",
-          snapRadius: data.snapRadius || 60,
-          stylePreset: this.inferStylePreset(data),
-          difficulty: data.difficulty || "自定义",
-          buried: data.buried,
-          pieceDefs: data.pieceDefs,
-          goals: data.goals || {}
-        };
-        this.syncUIFromState();
-        this.renderAll();
-        alert("关卡导入成功！");
+        const { state, issues, warnings } = this.inspectImportData(data);
+        this._pendingImportState = state;
+        this.showImportPreview(state, issues, warnings);
       } catch (err) {
         alert("导入失败：" + err.message);
       }
     };
     reader.readAsText(file);
     e.target.value = "";
+  },
+
+  inspectImportData(data) {
+    const issues = [];
+    const warnings = [];
+    const gridSize = data.gridSize || 25;
+    const validGridSizes = [16, 25, 36];
+    if (!validGridSizes.includes(gridSize)) {
+      issues.push(`探方尺寸 ${gridSize} 不是合法值（允许 16/25/36），将自动修正为 25`);
+      data.gridSize = 25;
+    }
+    const cols = Math.sqrt(data.gridSize);
+
+    const stylePreset = this.inferStylePreset(data);
+    const styleLabelMap = { bowl: "陶碗", tile: "瓦当", mirror: "铜镜", jade: "玉器" };
+
+    if (data.target && data.target.style) {
+      const bg = data.target.style.background;
+      const matchedPreset = Object.entries(STYLE_PRESETS).find(([, v]) => v.target.background === bg);
+      if (!matchedPreset) {
+        warnings.push(`导入文件使用了自定义器物样式（背景色 ${bg}），将映射为最接近的「${styleLabelMap[stylePreset] || stylePreset}」样式`);
+      }
+    }
+
+    const missingFields = [];
+    if (!data.name) { missingFields.push("name"); data.name = ""; }
+    if (!data.description) { missingFields.push("description"); data.description = ""; }
+    if (!data.timeLimit) { missingFields.push("timeLimit"); data.timeLimit = 120; }
+    if (!data.pieceName) { missingFields.push("pieceName"); data.pieceName = "碎片"; }
+    if (!data.snapRadius) { missingFields.push("snapRadius"); data.snapRadius = 60; }
+    if (!data.goals) { missingFields.push("goals"); data.goals = {}; }
+    if (!data.difficulty) { missingFields.push("difficulty"); data.difficulty = "自定义"; }
+    if (missingFields.length > 0) {
+      warnings.push(`以下字段缺失已自动补充默认值：${missingFields.join("、")}`);
+    }
+
+    if (data.pieceDefs) {
+      data.pieceDefs.forEach((piece, idx) => {
+        if (!piece.id) {
+          piece.id = "p" + (idx + 1);
+          warnings.push(`第 ${idx + 1} 个碎片缺少 id，已自动设为 ${piece.id}`);
+        }
+        if (!piece.label) {
+          piece.label = DEFAULT_LABELS[idx] || `碎片${idx + 1}`;
+          warnings.push(`第 ${idx + 1} 个碎片缺少标签，已自动设为「${piece.label}」`);
+        }
+        if (piece.slot === undefined || piece.slot === null) {
+          piece.slot = { x: 10 + (idx % 4) * 20, y: 10 + Math.floor(idx / 4) * 20 };
+          warnings.push(`第 ${idx + 1} 个碎片「${piece.label}」缺少槽位坐标，已自动分配`);
+        }
+        if (piece.slot) {
+          if (piece.slot.x < 0 || piece.slot.x > 100 || piece.slot.y < 0 || piece.slot.y > 100) {
+            issues.push(`碎片「${piece.label}」槽位坐标 (${piece.slot.x}, ${piece.slot.y}) 越界（允许 0~100），将自动钳制`);
+            piece.slot.x = Math.max(0, Math.min(100, piece.slot.x));
+            piece.slot.y = Math.max(0, Math.min(100, piece.slot.y));
+          }
+        }
+        if (piece.angle === undefined) { piece.angle = 0; }
+        if (piece.initialAngle === undefined) { piece.initialAngle = 0; }
+      });
+    }
+
+    if (data.buried) {
+      const burialCounts = {};
+      Object.entries(data.buried).forEach(([cell, pid]) => {
+        const cellNum = Number(cell);
+        if (isNaN(cellNum) || cellNum < 0 || cellNum >= gridSize) {
+          issues.push(`埋藏位置 ${cell} 超出探方范围（0~${gridSize - 1}），该埋藏将被移除`);
+        } else {
+          if (!burialCounts[cell]) burialCounts[cell] = [];
+          burialCounts[cell].push(pid);
+        }
+        if (!data.pieceDefs.find((p) => p.id === pid)) {
+          warnings.push(`埋藏位置 ${cell} 引用了不存在的碎片 ${pid}，该引用将被忽略`);
+        }
+      });
+      Object.entries(burialCounts).forEach(([cell, pids]) => {
+        if (pids.length > 1) {
+          issues.push(`探方格 ${cell} 存在 ${pids.length} 个碎片埋藏冲突（${pids.join("、")}），仅保留最后一个`);
+        }
+      });
+
+      const cleanedBuried = {};
+      const seenCells = {};
+      Object.entries(data.buried).forEach(([cell, pid]) => {
+        const cellNum = Number(cell);
+        if (cellNum < 0 || cellNum >= gridSize) return;
+        if (!data.pieceDefs.find((p) => p.id === pid)) return;
+        seenCells[cell] = pid;
+      });
+      data.buried = seenCells;
+    }
+
+    data.pieceDefs.forEach((piece) => {
+      const hasBuried = Object.values(data.buried).includes(piece.id);
+      if (!hasBuried) {
+        warnings.push(`碎片「${piece.label}」没有埋藏位置，需手动在探方编辑中设置`);
+      }
+    });
+
+    if (data.goals) {
+      Object.keys(data.goals).forEach((goalId) => {
+        if (!RESTORATION_GOALS[goalId]) {
+          warnings.push(`存在未知的修复目标类型「${goalId}」，该目标将被忽略`);
+          delete data.goals[goalId];
+        }
+      });
+    }
+
+    const state = {
+      isCustom: true,
+      id: data.id,
+      name: data.name || "",
+      description: data.description || "",
+      timeLimit: data.timeLimit || 120,
+      gridSize: data.gridSize || 25,
+      pieceName: data.pieceName || "碎片",
+      snapRadius: data.snapRadius || 60,
+      stylePreset: stylePreset,
+      difficulty: data.difficulty || "自定义",
+      buried: data.buried || {},
+      pieceDefs: data.pieceDefs || [],
+      goals: data.goals || {}
+    };
+
+    return { state, issues, warnings };
+  },
+
+  showImportPreview(state, issues, warnings) {
+    const styleLabelMap = { bowl: "陶碗 🍯", tile: "瓦当 🏺", mirror: "铜镜 🪞", jade: "玉器 💎" };
+    const gridSize = state.gridSize;
+    const cols = Math.sqrt(gridSize);
+
+    document.getElementById("importPreviewName").textContent = state.name || "（未命名）";
+    document.getElementById("importPreviewSize").textContent = `${cols} × ${cols}（${gridSize} 格）`;
+    document.getElementById("importPreviewPieceCount").textContent = String(state.pieceDefs.length);
+    document.getElementById("importPreviewStyle").textContent = styleLabelMap[state.stylePreset] || state.stylePreset;
+    document.getElementById("importPreviewTimeLimit").textContent = `${state.timeLimit} 秒`;
+    document.getElementById("importPreviewSnapRadius").textContent = String(state.snapRadius);
+
+    const issuesEl = document.getElementById("importPreviewIssues");
+    if (issues.length > 0) {
+      issuesEl.innerHTML = `<div class="import-preview-section import-preview-section-error">
+        <div class="import-preview-section-title">⚠️ 发现问题（已自动修正）</div>
+        <ul>${issues.map((i) => `<li>${i}</li>`).join("")}</ul>
+      </div>`;
+    } else {
+      issuesEl.innerHTML = "";
+    }
+
+    const warningsEl = document.getElementById("importPreviewWarnings");
+    if (warnings.length > 0) {
+      warningsEl.innerHTML = `<div class="import-preview-section import-preview-section-warn">
+        <div class="import-preview-section-title">💡 提示与警告</div>
+        <ul>${warnings.map((w) => `<li>${w}</li>`).join("")}</ul>
+      </div>`;
+    } else {
+      warningsEl.innerHTML = `<div class="import-preview-section import-preview-section-ok">
+        <div class="import-preview-section-title">✅ 未发现问题</div>
+      </div>`;
+    }
+
+    const confirmBtn = document.getElementById("importPreviewConfirmBtn");
+    if (issues.length > 0) {
+      confirmBtn.textContent = "确认导入（含自动修正）";
+    } else {
+      confirmBtn.textContent = "确认导入";
+    }
+
+    document.getElementById("importPreviewModal").classList.remove("hidden");
+  },
+
+  hideImportPreview() {
+    document.getElementById("importPreviewModal").classList.add("hidden");
+    this._pendingImportState = null;
+  },
+
+  applyImportedData() {
+    if (!this._pendingImportState) {
+      this.hideImportPreview();
+      return;
+    }
+    this.state = this._pendingImportState;
+    this.editingLevelId = this.state.id || null;
+    this.selectedPieceId = this.state.pieceDefs.length > 0 ? this.state.pieceDefs[0].id : null;
+    this.syncUIFromState();
+    this.renderAll();
+    document.getElementById("validationResult").innerHTML = "";
+    this.hideImportPreview();
+
+    const container = document.getElementById("validationResult");
+    container.className = "validation-result success";
+    container.innerHTML = `<strong>✅ 关卡导入成功！</strong> 请检查配置是否正确，可点击「校验配置」验证。`;
   },
 
   inferStylePreset(template) {

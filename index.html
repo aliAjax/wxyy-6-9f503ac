@@ -191,6 +191,49 @@
       </div>
     </section>
 
+    <div id="importPreviewModal" class="modal hidden">
+      <div class="modal-content import-preview-content">
+        <div class="modal-header">
+          <h2>📥 导入预览</h2>
+          <button type="button" class="close-btn" id="importPreviewCloseBtn">&times;</button>
+        </div>
+        <div class="modal-body import-preview-body">
+          <div class="import-preview-summary">
+            <div class="import-preview-field">
+              <span class="import-preview-label">关卡名称</span>
+              <span class="import-preview-value" id="importPreviewName">—</span>
+            </div>
+            <div class="import-preview-field">
+              <span class="import-preview-label">探方尺寸</span>
+              <span class="import-preview-value" id="importPreviewSize">—</span>
+            </div>
+            <div class="import-preview-field">
+              <span class="import-preview-label">碎片数量</span>
+              <span class="import-preview-value" id="importPreviewPieceCount">—</span>
+            </div>
+            <div class="import-preview-field">
+              <span class="import-preview-label">器物样式</span>
+              <span class="import-preview-value" id="importPreviewStyle">—</span>
+            </div>
+            <div class="import-preview-field">
+              <span class="import-preview-label">倒计时</span>
+              <span class="import-preview-value" id="importPreviewTimeLimit">—</span>
+            </div>
+            <div class="import-preview-field">
+              <span class="import-preview-label">贴合半径</span>
+              <span class="import-preview-value" id="importPreviewSnapRadius">—</span>
+            </div>
+          </div>
+          <div id="importPreviewIssues" class="import-preview-issues"></div>
+          <div id="importPreviewWarnings" class="import-preview-warnings"></div>
+        </div>
+        <div class="modal-footer import-preview-footer">
+          <button type="button" class="editor-btn" id="importPreviewCancelBtn">取消</button>
+          <button type="button" class="editor-btn primary" id="importPreviewConfirmBtn">确认导入</button>
+        </div>
+      </div>
+    </div>
+
     <section id="gameArea" class="layout hidden">
       <div class="mobile-tabs">
         <button class="mobile-tab-btn active" data-tab="dig">⛏️ 探方</button>
