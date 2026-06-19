@@ -256,6 +256,17 @@ h2 {
   margin-bottom: 14px;
 }
 
+.level-description {
+  margin: -4px 0 14px;
+  padding: 10px 12px;
+  border-left: 3px solid #698980;
+  border-radius: 6px;
+  background: #fff4d9;
+  color: #314c53;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
 .grid {
   display: grid;
   grid-template-columns: repeat(5, 1fr);

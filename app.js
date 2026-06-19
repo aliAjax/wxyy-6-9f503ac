@@ -11,6 +11,7 @@ const restartBtn = document.getElementById("restartBtn");
 const levelSelectEl = document.getElementById("levelSelect");
 const gameAreaEl = document.getElementById("gameArea");
 const levelNameEl = document.getElementById("levelName");
+const levelDescriptionEl = document.getElementById("levelDescription");
 const backBtn = document.getElementById("backBtn");
 const archiveBtn = document.getElementById("archiveBtn");
 const archiveModal = document.getElementById("archiveModal");
@@ -1310,6 +1311,9 @@ function selectLevel(templateId, skipAutoTutorial = false) {
   currentMobileTab = "dig";
   const template = artifactTemplates[templateId];
   levelNameEl.textContent = template.name;
+  const description = (template.description || "").trim();
+  levelDescriptionEl.textContent = description;
+  levelDescriptionEl.classList.toggle("hidden", description.length === 0);
   targetEl.className = "target";
   renderTarget();
   levelSelectEl.classList.add("hidden");
@@ -1339,6 +1343,8 @@ function goBack() {
   gameAreaEl.classList.add("hidden");
   resultEl.classList.add("hidden");
   backBtn.classList.add("hidden");
+  levelDescriptionEl.textContent = "";
+  levelDescriptionEl.classList.add("hidden");
   piecesEl.innerHTML = "";
   resetStatsDisplay();
 }
@@ -3180,6 +3186,8 @@ goBack = function () {
     gameAreaEl.classList.add("hidden");
     resultEl.classList.add("hidden");
     backBtn.classList.add("hidden");
+    levelDescriptionEl.textContent = "";
+    levelDescriptionEl.classList.add("hidden");
     piecesEl.innerHTML = "";
     resetStatsDisplay();
     return;
