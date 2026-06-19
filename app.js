@@ -374,6 +374,101 @@ const TOOLS = {
   }
 };
 
+const RESTORATION_GOALS = {
+  maxDigs: {
+    id: "maxDigs",
+    name: "精准挖掘",
+    icon: "⛏️",
+    description: (value) => `挖掘次数不超过 ${value} 次`,
+    shortDescription: (value) => `挖掘≤${value}次`,
+    checkValid: (value) => typeof value === "number" && value > 0,
+    evaluate: (state, template, value) => state.digs <= value
+  },
+  noHints: {
+    id: "noHints",
+    name: "独立完成",
+    icon: "🧠",
+    description: () => "全程不使用提示功能",
+    shortDescription: () => "不使用提示",
+    checkValid: () => true,
+    evaluate: (state) => state.hintsUsed === 0
+  },
+  noTools: {
+    id: "noTools",
+    name: "纯手工修复",
+    icon: "✋",
+    description: () => "不使用任何道具（探针、刷子、罗盘）",
+    shortDescription: () => "不使用道具",
+    checkValid: () => true,
+    evaluate: (state) =>
+      state.toolsUsed.probe === 0 &&
+      state.toolsUsed.brush === 0 &&
+      state.toolsUsed.compass === 0
+  },
+  timeLimit: {
+    id: "timeLimit",
+    name: "限时修复",
+    icon: "⏱️",
+    description: (value) => `在 ${value} 秒内完成修复`,
+    shortDescription: (value) => `用时≤${value}秒`,
+    checkValid: (value) => typeof value === "number" && value > 0,
+    evaluate: (state, template, value) => (template.timeLimit - state.timeLeft) <= value
+  },
+  avoidNegativeKeyEvents: {
+    id: "avoidNegativeKeyEvents",
+    name: "平安作业",
+    icon: "🛡️",
+    description: () => "不触发任何关键负面事件",
+    shortDescription: () => "无关键负面事件",
+    checkValid: () => true,
+    evaluate: (state) => {
+      return !state.keyEvents.some((e) => e.type === "negative");
+    }
+  },
+  noAngleMistakes: {
+    id: "noAngleMistakes",
+    name: "精准贴合",
+    icon: "🎯",
+    description: () => "修复过程中无角度判断失误",
+    shortDescription: () => "零角度失误",
+    checkValid: () => true,
+    evaluate: (state) => state.wrongAngleAttempts === 0
+  }
+};
+
+function evaluateGoals(template, state) {
+  const results = {};
+  const goals = template.goals || {};
+  for (const goalId of Object.keys(goals)) {
+    const goalDef = RESTORATION_GOALS[goalId];
+    if (!goalDef) continue;
+    const goalValue = goals[goalId];
+    results[goalId] = {
+      id: goalId,
+      name: goalDef.name,
+      icon: goalDef.icon,
+      value: goalValue,
+      achieved: goalDef.evaluate(state, template, goalValue),
+      description: goalDef.description(goalValue)
+    };
+  }
+  return results;
+}
+
+function getGoalsSummary(template) {
+  const goals = template.goals || {};
+  return Object.keys(goals).map((goalId) => {
+    const goalDef = RESTORATION_GOALS[goalId];
+    if (!goalDef) return null;
+    return {
+      id: goalId,
+      name: goalDef.name,
+      icon: goalDef.icon,
+      shortDescription: goalDef.shortDescription(goals[goalId])
+    };
+  }).filter(Boolean);
+}
+
 const artifactTemplates = {
   bowl: {
     id: "bowl",
@@ -424,7 +519,12 @@ const artifactTemplates = {
       { id: "p2", label: "上右", slot: { x: 51, y: 12 }, angle: 90, initialAngle: 225 },
       { id: "p3", label: "下左", slot: { x: 10, y: 53 }, angle: 180, initialAngle: 315 },
       { id: "p4", label: "下右", slot: { x: 51, y: 53 }, angle: 270, initialAngle: 45 }
-    ]
+    ],
+    goals: {
+      maxDigs: 12,
+      timeLimit: 60,
+      noHints: true
+    }
   },
   tile: {
     id: "tile",
@@ -479,7 +579,13 @@ const artifactTemplates = {
       { id: "p4", label: "右中", slot: { x: 55, y: 40 }, angle: 270, initialAngle: 90 },
       { id: "p5", label: "左下", slot: { x: 5, y: 68 }, angle: 0, initialAngle: 270 },
       { id: "p6", label: "右下", slot: { x: 55, y: 68 }, angle: 90, initialAngle: 315 }
-    ]
+    ],
+    goals: {
+      maxDigs: 18,
+      timeLimit: 90,
+      avoidNegativeKeyEvents: true,
+      noAngleMistakes: true
+    }
   },
   mirror: {
     id: "mirror",
@@ -544,7 +650,13 @@ const artifactTemplates = {
       { id: "p7", label: "左", slot: { x: 2, y: 38 }, angle: 270, initialAngle: 180 },
       { id: "p8", label: "左上", slot: { x: 8, y: 15 }, angle: 315, initialAngle: 270 },
       { id: "p9", label: "中心", slot: { x: 33, y: 38 }, angle: 0, initialAngle: 180 }
-    ]
+    ],
+    goals: {
+      maxDigs: 25,
+      timeLimit: 150,
+      noTools: true,
+      avoidNegativeKeyEvents: true
+    }
   }
 };
 
@@ -598,15 +710,22 @@ const archive = {
         const recordRatingOrder = RATING_ORDER[record.rating] || 0;
         const existingRatingOrder = RATING_ORDER[existing.rating] || 0;
 
+        const recordGoalsAchieved = record.goalsAchieved || 0;
+        const existingGoalsAchieved = existing.goalsAchieved || 0;
+
         if (recordRatingOrder > existingRatingOrder) {
           bestByLevel[record.levelId] = record;
         } else if (recordRatingOrder === existingRatingOrder) {
-          const recordScore = record.finalScore !== undefined ? record.finalScore : record.completeness;
-          const existingScore = existing.finalScore !== undefined ? existing.finalScore : existing.completeness;
-          if (recordScore > existingScore) {
+          if (recordGoalsAchieved > existingGoalsAchieved) {
             bestByLevel[record.levelId] = record;
-          } else if (recordScore === existingScore && record.timeUsed < existing.timeUsed) {
-            bestByLevel[record.levelId] = record;
+          } else if (recordGoalsAchieved === existingGoalsAchieved) {
+            const recordScore = record.finalScore !== undefined ? record.finalScore : record.completeness;
+            const existingScore = existing.finalScore !== undefined ? existing.finalScore : existing.completeness;
+            if (recordScore > existingScore) {
+              bestByLevel[record.levelId] = record;
+            } else if (recordScore === existingScore && record.timeUsed < existing.timeUsed) {
+              bestByLevel[record.levelId] = record;
+            }
           }
         }
       }
@@ -729,6 +848,18 @@ function createRecordCard(record, showBadge = false) {
     const eventList = record.keyEvents.map((e) => e.name).join(" · ");
     eventsDiv.innerHTML = `<span class="record-events-label">关键事件：</span>${eventList}`;
     card.appendChild(eventsDiv);
+  }
+
+  if (record.goals && Object.keys(record.goals).length > 0) {
+    const goalsDiv = document.createElement("div");
+    goalsDiv.className = "record-goals";
+    const goalsList = Object.values(record.goals).map(goal => {
+      return `<span class="record-goal-item ${goal.achieved ? 'achieved' : 'not-achieved'}" title="${goal.description}">
+        ${goal.icon} ${goal.name}${goal.achieved ? ' ✓' : ' ✗'}
+      </span>`;
+    }).join("");
+    goalsDiv.innerHTML = `<span class="record-goals-label">🎯 修复目标 (${record.goalsAchieved || 0}/${record.goalsTotal || 0})：</span>${goalsList}`;
+    card.appendChild(goalsDiv);
   }
 
   return card;
@@ -1469,6 +1600,28 @@ function showLevelPreview(templateId, isDaily = false, isPractice = false) {
     previewToolsEl.appendChild(toolEl);
   });
 
+  const previewGoalsSection = document.getElementById("previewGoalsSection");
+  const previewGoalsEl = document.getElementById("previewGoals");
+  previewGoalsEl.innerHTML = "";
+  const goalsSummary = getGoalsSummary(template);
+  if (goalsSummary.length > 0) {
+    previewGoalsSection.classList.remove("hidden");
+    goalsSummary.forEach(goal => {
+      const goalEl = document.createElement("div");
+      goalEl.className = "preview-goal";
+      goalEl.innerHTML = `
+        <span class="preview-goal-icon">${goal.icon}</span>
+        <div class="preview-goal-info">
+          <span class="preview-goal-name">${goal.name}</span>
+          <span class="preview-goal-desc">${goal.shortDescription}</span>
+        </div>
+      `;
+      previewGoalsEl.appendChild(goalEl);
+    });
+  } else {
+    previewGoalsSection.classList.add("hidden");
+  }
+
   if (isDaily) {
     previewStartBtn.textContent = isPractice ? "🔄 练习模式" : "🎮 开始挑战";
   } else {
@@ -2158,6 +2311,31 @@ function finish(success, message) {
     eventsHtml += `</ul></div>`;
   }
 
+  const goalResults = evaluateGoals(template, state);
+  const goalsCount = Object.keys(goalResults).length;
+  const achievedGoalsCount = Object.values(goalResults).filter(g => g.achieved).length;
+
+  let goalsHtml = "";
+  if (goalsCount > 0) {
+    goalsHtml = `
+      <div class="settlement-goals">
+        <h3>🎯 修复目标 <span class="goals-progress">(${achievedGoalsCount}/${goalsCount})</span></h3>
+        <div class="settlement-goals-list">
+          ${Object.values(goalResults).map(goal => `
+            <div class="settlement-goal-item ${goal.achieved ? 'achieved' : 'not-achieved'}">
+              <span class="settlement-goal-icon">${goal.icon}</span>
+              <div class="settlement-goal-info">
+                <span class="settlement-goal-name">${goal.name}</span>
+                <span class="settlement-goal-desc">${goal.description}</span>
+              </div>
+              <span class="settlement-goal-status">${goal.achieved ? '✓ 达成' : '✗ 未达成'}</span>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
+  }
+
   let settlementHtml = "";
   if (success) {
     const rating = getRating(scores.totalScore);
@@ -2166,6 +2344,7 @@ function finish(success, message) {
 
     settlementHtml = `
       <div class="settlement">
+        ${goalsHtml}
         <div class="settlement-rating rating-${rating}">
           <div class="rating-label">专家评级</div>
           <div class="rating-badge">${rating}</div>
@@ -2227,6 +2406,9 @@ function finish(success, message) {
       hintsUsed: state.hintsUsed,
       wrongAngleAttempts: state.wrongAngleAttempts,
       toolsUsed: { ...state.toolsUsed },
+      goals: goalResults,
+      goalsAchieved: achievedGoalsCount,
+      goalsTotal: goalsCount,
       completedAt: Date.now()
     };
     archive.addRecord(record);
@@ -2235,6 +2417,7 @@ function finish(success, message) {
     const totalColor = getScoreColor(scores.totalScore);
     settlementHtml = `
       <div class="settlement">
+        ${goalsHtml}
         <div class="settlement-rating rating-F">
           <div class="rating-label">专家评级</div>
           <div class="rating-badge">F</div>
@@ -2338,6 +2521,37 @@ function renderStats() {
   timeLeftEl.textContent = state.timeLeft;
   digCountEl.textContent = state.digs;
   progressEl.textContent = `${Math.round((state.locked.size / template.pieceDefs.length) * 100)}%`;
+  renderGoals();
+}
+
+function renderGoals() {
+  const template = artifactTemplates[currentTemplate];
+  const goalsPanel = document.getElementById("goalsPanel");
+  const goalsListEl = document.getElementById("goalsList");
+  const goals = template.goals || {};
+
+  if (Object.keys(goals).length === 0) {
+    goalsPanel.classList.add("hidden");
+    return;
+  }
+
+  goalsPanel.classList.remove("hidden");
+  goalsListEl.innerHTML = "";
+
+  const goalResults = evaluateGoals(template, state);
+  Object.values(goalResults).forEach(result => {
+    const goalEl = document.createElement("div");
+    goalEl.className = "goal-item" + (result.achieved ? " achieved" : "");
+    goalEl.innerHTML = `
+      <span class="goal-icon">${result.icon}</span>
+      <div class="goal-info">
+        <span class="goal-name">${result.name}</span>
+        <span class="goal-desc">${result.description}</span>
+      </div>
+      <span class="goal-status">${result.achieved ? "✓" : "○"}</span>
+    `;
+    goalsListEl.appendChild(goalEl);
+  });
 }
 
 function renderTools() {
@@ -2722,7 +2936,8 @@ const editor = {
       stylePreset: stylePreset,
       difficulty: template.difficulty || "自定义",
       buried: JSON.parse(JSON.stringify(template.buried || {})),
-      pieceDefs: JSON.parse(JSON.stringify(template.pieceDefs || []))
+      pieceDefs: JSON.parse(JSON.stringify(template.pieceDefs || [])),
+      goals: JSON.parse(JSON.stringify(template.goals || {}))
     };
   },
 
@@ -2803,7 +3018,8 @@ const editor = {
       stylePreset: "bowl",
       difficulty: "自定义",
       buried: {},
-      pieceDefs: []
+      pieceDefs: [],
+      goals: {}
     };
   },
 
@@ -2824,7 +3040,96 @@ const editor = {
     this.renderGrid();
     this.renderSlots();
     this.renderTargetStyle();
+    this.renderGoalsEditor();
     this.updatePieceCount();
+  },
+
+  renderGoalsEditor() {
+    const container = document.getElementById("editorGoalsList");
+    if (!container) return;
+    container.innerHTML = "";
+
+    if (!this.state.goals) this.state.goals = {};
+
+    const goalIds = Object.keys(RESTORATION_GOALS);
+    goalIds.forEach(goalId => {
+      const goalDef = RESTORATION_GOALS[goalId];
+      const enabled = this.state.goals[goalId] !== undefined;
+      const goalValue = this.state.goals[goalId];
+
+      const wrapper = document.createElement("div");
+      wrapper.className = "editor-goal-item" + (enabled ? " enabled" : "");
+
+      const needsValue = goalId === "maxDigs" || goalId === "timeLimit";
+
+      let valueInput = "";
+      if (needsValue) {
+        let defaultVal = 0;
+        if (goalId === "maxDigs") defaultVal = Math.ceil((this.state.gridSize || 25) * 0.6);
+        if (goalId === "timeLimit") defaultVal = Math.floor((this.state.timeLimit || 120) * 0.8);
+        valueInput = `
+          <input type="number" class="editor-goal-value" min="1" 
+            ${enabled ? "" : "disabled"} 
+            value="${enabled && goalValue ? goalValue : defaultVal}">
+        `;
+      }
+
+      wrapper.innerHTML = `
+        <label class="editor-goal-checkbox">
+          <input type="checkbox" ${enabled ? "checked" : ""}>
+          <span class="editor-goal-icon">${goalDef.icon}</span>
+          <div class="editor-goal-info">
+            <span class="editor-goal-name">${goalDef.name}</span>
+            <span class="editor-goal-desc">${goalDef.description(
+              needsValue ? (enabled && goalValue ? goalValue : (goalId === "maxDigs" ? "N" : "N")) : true
+            )}</span>
+          </div>
+          ${valueInput}
+        </label>
+      `;
+
+      const checkbox = wrapper.querySelector('input[type="checkbox"]');
+      checkbox.addEventListener("change", (e) => {
+        if (e.target.checked) {
+          if (needsValue) {
+            const valInput = wrapper.querySelector(".editor-goal-value");
+            const val = Number(valInput.value);
+            if (val > 0) {
+              this.state.goals[goalId] = val;
+            } else {
+              this.state.goals[goalId] = goalId === "maxDigs" 
+                ? Math.ceil((this.state.gridSize || 25) * 0.6) 
+                : Math.floor((this.state.timeLimit || 120) * 0.8);
+              valInput.value = this.state.goals[goalId];
+            }
+          } else {
+            this.state.goals[goalId] = true;
+          }
+        } else {
+          delete this.state.goals[goalId];
+        }
+        this.renderGoalsEditor();
+      });
+
+      if (needsValue) {
+        const valInput = wrapper.querySelector(".editor-goal-value");
+        valInput.addEventListener("change", (e) => {
+          const val = Number(e.target.value);
+          if (val > 0 && this.state.goals[goalId] !== undefined) {
+            this.state.goals[goalId] = val;
+            const descEl = wrapper.querySelector(".editor-goal-desc");
+            if (descEl) descEl.textContent = goalDef.description(val);
+          }
+        });
+        valInput.addEventListener("input", (e) => {
+          const val = Number(e.target.value);
+          const descEl = wrapper.querySelector(".editor-goal-desc");
+          if (descEl && val > 0) descEl.textContent = goalDef.description(val);
+        });
+      }
+
+      container.appendChild(wrapper);
+    });
   },
 
   updatePieceCount() {
@@ -3194,6 +3499,25 @@ const editor = {
       }
     });
 
+    if (this.state.goals) {
+      Object.entries(this.state.goals).forEach(([goalId, goalValue]) => {
+        const goalDef = RESTORATION_GOALS[goalId];
+        if (!goalDef) {
+          warnings.push(`存在未知的修复目标类型：${goalId}`);
+          return;
+        }
+        if (goalDef.checkValid && !goalDef.checkValid(goalValue)) {
+          errors.push(`修复目标「${goalDef.name}」的参数无效：${goalValue}`);
+        }
+        if (goalId === "timeLimit" && typeof goalValue === "number" && this.state.timeLimit && goalValue > this.state.timeLimit) {
+          errors.push(`修复目标「限时修复」的时间(${goalValue}秒)不能大于关卡总时长(${this.state.timeLimit}秒)`);
+        }
+        if (goalId === "maxDigs" && typeof goalValue === "number" && goalValue < this.state.pieceDefs.length) {
+          warnings.push(`修复目标「精准挖掘」的挖掘次数(${goalValue}次)少于碎片数量(${this.state.pieceDefs.length})，可能难以达成`);
+        }
+      });
+    }
+
     return { errors, warnings, valid: errors.length === 0 };
   },
 
@@ -3256,7 +3580,8 @@ const editor = {
         style: preset.piece
       },
       buried: JSON.parse(JSON.stringify(state.buried)),
-      pieceDefs: JSON.parse(JSON.stringify(state.pieceDefs))
+      pieceDefs: JSON.parse(JSON.stringify(state.pieceDefs)),
+      goals: JSON.parse(JSON.stringify(state.goals || {}))
     };
   },
 
@@ -3341,7 +3666,8 @@ const editor = {
           stylePreset: this.inferStylePreset(data),
           difficulty: data.difficulty || "自定义",
           buried: data.buried,
-          pieceDefs: data.pieceDefs
+          pieceDefs: data.pieceDefs,
+          goals: data.goals || {}
         };
         this.syncUIFromState();
         this.renderAll();

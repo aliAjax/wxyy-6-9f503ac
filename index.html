@@ -66,6 +66,10 @@
               <h4 class="preview-section-title">可用工具</h4>
               <div id="previewTools" class="preview-tools"></div>
             </div>
+            <div class="preview-section" id="previewGoalsSection">
+              <h4 class="preview-section-title">🎯 修复目标</h4>
+              <div id="previewGoals" class="preview-goals"></div>
+            </div>
             <div class="preview-actions">
               <button id="previewStartBtn" type="button" class="preview-start-btn">🎮 开始修复</button>
               <button id="previewCopyBtn" type="button" class="preview-copy-btn">📋 复制为自定义关卡</button>
@@ -142,6 +146,12 @@
         </div>
 
         <div class="editor-panel">
+          <h3>🎯 修复目标</h3>
+          <p class="editor-hint">设置本关卡的额外挑战目标，达成可获得最佳成绩加成。</p>
+          <div id="editorGoalsList" class="editor-goals-list"></div>
+        </div>
+
+        <div class="editor-panel">
           <h3>碎片管理 <span class="piece-count-badge" id="pieceCountBadge">0</span></h3>
           <div class="editor-piece-actions">
             <button id="addPieceBtn" type="button" class="editor-btn">+ 添加碎片</button>
@@ -206,6 +216,10 @@
         </div>
 
         <div id="grid" class="grid"></div>
+        <div id="goalsPanel" class="goals-panel hidden">
+          <div class="goals-panel-header">🎯 修复目标</div>
+          <div id="goalsList" class="goals-list"></div>
+        </div>
         <div id="compassIndicator" class="compass-indicator hidden">
           <div class="compass-arrow"></div>
           <div class="compass-distance"></div>
