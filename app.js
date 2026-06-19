@@ -18,6 +18,8 @@ const archiveModal = document.getElementById("archiveModal");
 const closeArchiveBtn = document.getElementById("closeArchiveBtn");
 const clearArchiveBtn = document.getElementById("clearArchiveBtn");
 const confirmModal = document.getElementById("confirmModal");
+const statsOverviewEl = document.getElementById("statsOverview");
+const statsLevelListEl = document.getElementById("statsLevelList");
 const cancelClearBtn = document.getElementById("cancelClearBtn");
 const confirmClearBtn = document.getElementById("confirmClearBtn");
 const recentRecordsEl = document.getElementById("recentRecords");
@@ -132,9 +134,12 @@ const gameSettings = {
   },
   syncUI() {
     const s = this.load();
-    document.getElementById("settingEventAnim").checked = s.eventAnim;
-    document.getElementById("settingVibration").checked = s.vibration;
-    document.getElementById("settingAutoTutorial").checked = s.autoTutorial;
+    const settingEventAnim = document.getElementById("settingEventAnim");
+    const settingVibration = document.getElementById("settingVibration");
+    const settingAutoTutorial = document.getElementById("settingAutoTutorial");
+    if (settingEventAnim) settingEventAnim.checked = s.eventAnim;
+    if (settingVibration) settingVibration.checked = s.vibration;
+    if (settingAutoTutorial) settingAutoTutorial.checked = s.autoTutorial;
   }
 };
 
@@ -793,6 +798,336 @@ const archive = {
   }
 };
 
+const LEVEL_CATEGORY = {
+  OFFICIAL: "official",
+  CUSTOM: "custom",
+  DAILY: "daily",
+  UNKNOWN: "unknown"
+};
+
+function getLevelCategory(levelId) {
+  if (!levelId) return LEVEL_CATEGORY.UNKNOWN;
+  if (levelId.startsWith("daily_")) return LEVEL_CATEGORY.DAILY;
+  if (levelId.startsWith("custom_")) return LEVEL_CATEGORY.CUSTOM;
+  if (artifactTemplates[levelId]) return LEVEL_CATEGORY.OFFICIAL;
+  return LEVEL_CATEGORY.UNKNOWN;
+}
+
+function getCategoryLabel(category) {
+  const map = {
+    [LEVEL_CATEGORY.OFFICIAL]: "官方关卡",
+    [LEVEL_CATEGORY.CUSTOM]: "自定义关卡",
+    [LEVEL_CATEGORY.DAILY]: "每日挑战",
+    [LEVEL_CATEGORY.UNKNOWN]: "未知"
+  };
+  return map[category] || "未知";
+}
+
+const TOOL_NAMES = {
+  probe: { name: "探针", icon: "📍" },
+  brush: { name: "刷子", icon: "🖌️" },
+  compass: { name: "罗盘", icon: "🧭" },
+  trowel: { name: "小手铲", icon: "🔧" }
+};
+
+function calculateLevelStats(records) {
+  if (!records || records.length === 0) return null;
+
+  const validRecords = records.filter(r => r && r.completedAt);
+  if (validRecords.length === 0) return null;
+
+  const totalCompletions = validRecords.length;
+
+  let bestRating = null;
+  let bestRatingOrder = -1;
+  let bestScore = null;
+  let totalTime = 0;
+  let timeCount = 0;
+  let totalDigs = 0;
+  let digsCount = 0;
+
+  const toolUsageCount = { probe: 0, brush: 0, compass: 0, trowel: 0 };
+  const eventCountMap = {};
+
+  for (const record of validRecords) {
+    const ratingOrder = RATING_ORDER[record.rating] || 0;
+    if (ratingOrder > bestRatingOrder) {
+      bestRatingOrder = ratingOrder;
+      bestRating = record.rating;
+    }
+
+    const score = record.finalScore !== undefined ? record.finalScore : (record.completeness || 0);
+    if (bestScore === null || score > bestScore) {
+      bestScore = score;
+    }
+
+    if (record.timeUsed !== undefined && record.timeUsed !== null) {
+      totalTime += record.timeUsed;
+      timeCount++;
+    }
+
+    if (record.digs !== undefined && record.digs !== null) {
+      totalDigs += record.digs;
+      digsCount++;
+    }
+
+    if (record.toolsUsed) {
+      for (const tool of ["probe", "brush", "compass", "trowel"]) {
+        if (record.toolsUsed[tool] !== undefined && record.toolsUsed[tool] > 0) {
+          toolUsageCount[tool] += record.toolsUsed[tool];
+        }
+      }
+    }
+
+    if (record.keyEvents && Array.isArray(record.keyEvents)) {
+      for (const event of record.keyEvents) {
+        const eventName = event.name || event;
+        eventCountMap[eventName] = (eventCountMap[eventName] || 0) + 1;
+      }
+    }
+  }
+
+  const avgTime = timeCount > 0 ? Math.round(totalTime / timeCount) : null;
+  const avgDigs = digsCount > 0 ? Math.round(totalDigs / digsCount) : null;
+
+  const sortedTools = Object.entries(toolUsageCount)
+    .filter(([, count]) => count > 0)
+    .sort((a, b) => b[1] - a[1]);
+  const mostUsedTool = sortedTools.length > 0 ? sortedTools[0] : null;
+
+  const sortedEvents = Object.entries(eventCountMap)
+    .sort((a, b) => b[1] - a[1]);
+  const mostCommonEvent = sortedEvents.length > 0 ? sortedEvents[0] : null;
+
+  return {
+    totalCompletions,
+    bestRating,
+    bestScore,
+    avgTime,
+    avgDigs,
+    mostUsedTool,
+    mostCommonEvent,
+    toolBreakdown: toolUsageCount,
+    eventBreakdown: eventCountMap
+  };
+}
+
+function calculateOverallStats(records, filter = "all") {
+  let filteredRecords = records || [];
+
+  if (filter !== "all") {
+    filteredRecords = filteredRecords.filter(r => getLevelCategory(r.levelId) === filter);
+  }
+
+  const totalCompletions = filteredRecords.length;
+  const uniqueLevels = new Set(filteredRecords.map(r => r.levelId)).size;
+
+  const recordsByLevel = {};
+  for (const record of filteredRecords) {
+    if (!recordsByLevel[record.levelId]) {
+      recordsByLevel[record.levelId] = [];
+    }
+    recordsByLevel[record.levelId].push(record);
+  }
+
+  let totalTime = 0;
+  let timeCount = 0;
+  let totalDigs = 0;
+  let digsCount = 0;
+  let totalScore = 0;
+  let scoreCount = 0;
+  let sCount = 0;
+  let aCount = 0;
+
+  for (const record of filteredRecords) {
+    if (record.timeUsed !== undefined && record.timeUsed !== null) {
+      totalTime += record.timeUsed;
+      timeCount++;
+    }
+    if (record.digs !== undefined && record.digs !== null) {
+      totalDigs += record.digs;
+      digsCount++;
+    }
+    if (record.finalScore !== undefined) {
+      totalScore += record.finalScore;
+      scoreCount++;
+    } else if (record.completeness !== undefined) {
+      totalScore += record.completeness;
+      scoreCount++;
+    }
+    if (record.rating === "S") sCount++;
+    else if (record.rating === "A") aCount++;
+  }
+
+  const levelStatsList = [];
+  for (const [levelId, levelRecords] of Object.entries(recordsByLevel)) {
+    const stats = calculateLevelStats(levelRecords);
+    if (stats) {
+      const sampleRecord = levelRecords[0];
+      levelStatsList.push({
+        levelId,
+        levelName: sampleRecord.levelName || levelId,
+        category: getLevelCategory(levelId),
+        ...stats
+      });
+    }
+  }
+
+  levelStatsList.sort((a, b) => b.totalCompletions - a.totalCompletions);
+
+  return {
+    totalCompletions,
+    uniqueLevels,
+    avgTime: timeCount > 0 ? Math.round(totalTime / timeCount) : null,
+    avgDigs: digsCount > 0 ? Math.round(totalDigs / digsCount) : null,
+    avgScore: scoreCount > 0 ? Math.round(totalScore / scoreCount) : null,
+    sCount,
+    aCount,
+    levelStatsList
+  };
+}
+
+let currentStatsFilter = "all";
+
+function renderStatsOverview() {
+  const records = archive.load();
+  const overallStats = calculateOverallStats(records, currentStatsFilter);
+
+  statsOverviewEl.innerHTML = "";
+
+  if (!overallStats || overallStats.totalCompletions === 0) {
+    const empty = document.createElement("div");
+    empty.className = "empty-state";
+    empty.textContent = "暂无统计数据，快去完成修复任务吧！";
+    statsOverviewEl.appendChild(empty);
+    return;
+  }
+
+  const overview = document.createElement("div");
+  overview.className = "stats-overview-grid";
+
+  const cards = [
+    { label: "总完成次数", value: overallStats.totalCompletions, icon: "📊", class: "stat-completions" },
+    { label: "挑战关卡数", value: overallStats.uniqueLevels, icon: "🎯", class: "stat-levels" },
+    { label: "平均用时", value: overallStats.avgTime !== null ? `${overallStats.avgTime}秒` : "—", icon: "⏱️", class: "stat-time" },
+    { label: "平均挖掘", value: overallStats.avgDigs !== null ? `${overallStats.avgDigs}次` : "—", icon: "⛏️", class: "stat-digs" },
+    { label: "平均评分", value: overallStats.avgScore !== null ? overallStats.avgScore : "—", icon: "⭐", class: "stat-score" },
+    { label: "S/A评级", value: `${overallStats.sCount}S / ${overallStats.aCount}A`, icon: "🏆", class: "stat-ratings" }
+  ];
+
+  for (const card of cards) {
+    const cardEl = document.createElement("div");
+    cardEl.className = `stats-overview-card ${card.class}`;
+    cardEl.innerHTML = `
+      <div class="stats-card-icon">${card.icon}</div>
+      <div class="stats-card-content">
+        <div class="stats-card-label">${card.label}</div>
+        <div class="stats-card-value">${card.value}</div>
+      </div>
+    `;
+    overview.appendChild(cardEl);
+  }
+
+  statsOverviewEl.appendChild(overview);
+}
+
+function renderStatsLevelList() {
+  const records = archive.load();
+  const overallStats = calculateOverallStats(records, currentStatsFilter);
+
+  statsLevelListEl.innerHTML = "";
+
+  if (!overallStats || overallStats.levelStatsList.length === 0) {
+    const empty = document.createElement("div");
+    empty.className = "empty-state";
+    empty.textContent = "该分类暂无记录数据";
+    statsLevelListEl.appendChild(empty);
+    return;
+  }
+
+  for (const levelStat of overallStats.levelStatsList) {
+    const card = document.createElement("div");
+    card.className = "stats-level-card";
+
+    const category = getCategoryLabel(levelStat.category);
+    const categoryClass = `category-${levelStat.category}`;
+
+    const ratingBadge = levelStat.bestRating
+      ? `<span class="stats-rating-badge record-rating-${levelStat.bestRating}">${levelStat.bestRating}</span>`
+      : "";
+
+    const avgTimeText = levelStat.avgTime !== null ? `${levelStat.avgTime}秒` : "—";
+    const avgDigsText = levelStat.avgDigs !== null ? `${levelStat.avgDigs}次` : "—";
+    const bestScoreText = levelStat.bestScore !== null ? levelStat.bestScore : "—";
+
+    let toolText = "—";
+    if (levelStat.mostUsedTool) {
+      const [toolId, count] = levelStat.mostUsedTool;
+      const tool = TOOL_NAMES[toolId];
+      if (tool) {
+        toolText = `${tool.icon} ${tool.name}×${count}`;
+      }
+    }
+
+    let eventText = "—";
+    if (levelStat.mostCommonEvent) {
+      const [eventName, count] = levelStat.mostCommonEvent;
+      eventText = `${eventName} (${count}次)`;
+    }
+
+    const maxCompletions = Math.max(...overallStats.levelStatsList.map(s => s.totalCompletions));
+    const progressPercent = maxCompletions > 0 ? Math.round((levelStat.totalCompletions / maxCompletions) * 100) : 0;
+
+    card.innerHTML = `
+      <div class="stats-level-header">
+        <div class="stats-level-title">
+          <span class="stats-level-name">${levelStat.levelName}</span>
+          ${ratingBadge}
+          <span class="stats-level-category ${categoryClass}">${category}</span>
+        </div>
+        <div class="stats-level-completions">
+          <span class="completions-count">${levelStat.totalCompletions}</span>
+          <span class="completions-label">次</span>
+        </div>
+      </div>
+      <div class="stats-level-progress">
+        <div class="progress-bar-bg">
+          <div class="progress-bar-fill" style="width: ${progressPercent}%"></div>
+        </div>
+      </div>
+      <div class="stats-level-details">
+        <div class="stats-detail-item">
+          <span class="stats-detail-label">最高评分</span>
+          <span class="stats-detail-value">${bestScoreText}</span>
+        </div>
+        <div class="stats-detail-item">
+          <span class="stats-detail-label">平均用时</span>
+          <span class="stats-detail-value">${avgTimeText}</span>
+        </div>
+        <div class="stats-detail-item">
+          <span class="stats-detail-label">平均挖掘</span>
+          <span class="stats-detail-value">${avgDigsText}</span>
+        </div>
+        <div class="stats-detail-item">
+          <span class="stats-detail-label">常用工具</span>
+          <span class="stats-detail-value">${toolText}</span>
+        </div>
+        <div class="stats-detail-item stats-detail-full">
+          <span class="stats-detail-label">最常事件</span>
+          <span class="stats-detail-value">${eventText}</span>
+        </div>
+      </div>
+    `;
+
+    statsLevelListEl.appendChild(card);
+  }
+}
+
+function renderStats() {
+  renderStatsOverview();
+  renderStatsLevelList();
+}
+
 function formatDateTime(timestamp) {
   const date = new Date(timestamp);
   const year = date.getFullYear();
@@ -978,6 +1313,9 @@ function renderBestRecords() {
 function openArchive() {
   renderRecentRecords();
   renderBestRecords();
+  currentStatsFilter = "all";
+  updateFilterButtons();
+  renderStats();
   archiveModal.classList.remove("hidden");
 }
 
@@ -997,7 +1335,26 @@ function clearArchive() {
   archive.clear();
   renderRecentRecords();
   renderBestRecords();
+  renderStats();
   closeConfirmModal();
+}
+
+function updateFilterButtons() {
+  document.querySelectorAll(".level-filter-btn").forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.filter === currentStatsFilter);
+  });
+}
+
+function switchArchiveTab(tabName) {
+  document.querySelectorAll(".tab-btn").forEach(b => {
+    b.classList.toggle("active", b.dataset.tab === tabName);
+  });
+  document.querySelectorAll(".tab-content").forEach(c => {
+    c.classList.toggle("active", c.id === `${tabName}Tab`);
+  });
+  if (tabName === "stats") {
+    renderStats();
+  }
 }
 
 function renderLevelCards() {
@@ -1494,8 +1851,8 @@ function init() {
   restartBtn.addEventListener("click", reset);
   hintBtn.addEventListener("click", useHint);
   backBtn.addEventListener("click", goBack);
-  closePreviewBtn.addEventListener("click", hideLevelPreview);
-  previewStartBtn.addEventListener("click", startFromPreview);
+  if (closePreviewBtn) closePreviewBtn.addEventListener("click", hideLevelPreview);
+  if (previewStartBtn) previewStartBtn.addEventListener("click", startFromPreview);
   archiveBtn.addEventListener("click", openArchive);
   closeArchiveBtn.addEventListener("click", closeArchive);
   clearArchiveBtn.addEventListener("click", openConfirmModal);
@@ -1505,30 +1862,41 @@ function init() {
   const settingsModal = document.getElementById("settingsModal");
   const settingsBtn = document.getElementById("settingsBtn");
   const closeSettingsBtn = document.getElementById("closeSettingsBtn");
-  settingsBtn.addEventListener("click", () => {
-    gameSettings.syncUI();
-    settingsModal.classList.remove("hidden");
-  });
-  closeSettingsBtn.addEventListener("click", () => {
-    settingsModal.classList.add("hidden");
-  });
-  settingsModal.addEventListener("click", (e) => {
-    if (e.target === settingsModal) settingsModal.classList.add("hidden");
-  });
-  document.getElementById("settingEventAnim").addEventListener("change", (e) => {
-    gameSettings.set("eventAnim", e.target.checked);
-  });
-  document.getElementById("settingVibration").addEventListener("change", (e) => {
-    gameSettings.set("vibration", e.target.checked);
-  });
-  document.getElementById("settingAutoTutorial").addEventListener("change", (e) => {
-    gameSettings.set("autoTutorial", e.target.checked);
-  });
+  if (settingsBtn && settingsModal && closeSettingsBtn) {
+    settingsBtn.addEventListener("click", () => {
+      gameSettings.syncUI();
+      settingsModal.classList.remove("hidden");
+    });
+    closeSettingsBtn.addEventListener("click", () => {
+      settingsModal.classList.add("hidden");
+    });
+    settingsModal.addEventListener("click", (e) => {
+      if (e.target === settingsModal) settingsModal.classList.add("hidden");
+    });
+  }
+  const settingEventAnim = document.getElementById("settingEventAnim");
+  if (settingEventAnim) {
+    settingEventAnim.addEventListener("change", (e) => {
+      gameSettings.set("eventAnim", e.target.checked);
+    });
+  }
+  const settingVibration = document.getElementById("settingVibration");
+  if (settingVibration) {
+    settingVibration.addEventListener("change", (e) => {
+      gameSettings.set("vibration", e.target.checked);
+    });
+  }
+  const settingAutoTutorial = document.getElementById("settingAutoTutorial");
+  if (settingAutoTutorial) {
+    settingAutoTutorial.addEventListener("change", (e) => {
+      gameSettings.set("autoTutorial", e.target.checked);
+    });
+  }
 
   probeBtn.addEventListener("click", () => useTool("probe"));
   brushBtn.addEventListener("click", () => useTool("brush"));
   compassBtn.addEventListener("click", () => useTool("compass"));
-  trowelBtn.addEventListener("click", () => useTool("trowel"));
+  if (trowelBtn) trowelBtn.addEventListener("click", () => useTool("trowel"));
 
   document.addEventListener("keydown", (e) => {
     if (!state || !state.running) return;
@@ -1649,11 +2017,15 @@ function init() {
 
   document.querySelectorAll(".tab-btn").forEach((btn) => {
     btn.addEventListener("click", () => {
-      const tab = btn.dataset.tab;
-      document.querySelectorAll(".tab-btn").forEach((b) => b.classList.remove("active"));
-      document.querySelectorAll(".tab-content").forEach((c) => c.classList.remove("active"));
-      btn.classList.add("active");
-      document.getElementById(`${tab}Tab`).classList.add("active");
+      switchArchiveTab(btn.dataset.tab);
+    });
+  });
+
+  document.querySelectorAll(".level-filter-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      currentStatsFilter = btn.dataset.filter;
+      updateFilterButtons();
+      renderStats();
     });
   });
 
@@ -1882,6 +2254,7 @@ function renderToolkitSelector(template, isLocked, isPractice) {
 function showLevelPreview(templateId, isDaily = false, isPractice = false) {
   const template = artifactTemplates[templateId];
   if (!template) return;
+  if (!previewIconEl || !previewNameEl || !previewDifficultyEl || !previewDescriptionEl) return;
 
   currentPreviewTemplateId = templateId;
   currentPreviewIsDaily = isDaily;
@@ -3467,27 +3840,33 @@ const editor = {
   _pendingImportState: null,
 
   init() {
+    if (!document.getElementById("openEditorBtn")) return;
     this.bindUI();
   },
 
   bindUI() {
-    document.getElementById("openEditorBtn").addEventListener("click", () => this.open());
-    document.getElementById("editorBackBtn").addEventListener("click", () => this.close());
-    document.getElementById("duplicateLevelBtn").addEventListener("click", () => this.duplicate());
-    document.getElementById("addPieceBtn").addEventListener("click", () => this.addPiece());
-    document.getElementById("clearPiecesBtn").addEventListener("click", () => this.clearPieces());
-    document.getElementById("validateBtn").addEventListener("click", () => this.validateAndShow());
-    document.getElementById("previewBtn").addEventListener("click", () => this.preview());
-    document.getElementById("saveLevelBtn").addEventListener("click", () => this.save());
-    document.getElementById("exportLevelBtn").addEventListener("click", () => this.exportJSON());
-    document.getElementById("importLevelBtn").addEventListener("click", () => {
-      document.getElementById("importFileInput").click();
+    const addListener = (id, event, handler) => {
+      const el = document.getElementById(id);
+      if (el) el.addEventListener(event, handler);
+    };
+    addListener("openEditorBtn", "click", () => this.open());
+    addListener("editorBackBtn", "click", () => this.close());
+    addListener("duplicateLevelBtn", "click", () => this.duplicate());
+    addListener("addPieceBtn", "click", () => this.addPiece());
+    addListener("clearPiecesBtn", "click", () => this.clearPieces());
+    addListener("validateBtn", "click", () => this.validateAndShow());
+    addListener("previewBtn", "click", () => this.preview());
+    addListener("saveLevelBtn", "click", () => this.save());
+    addListener("exportLevelBtn", "click", () => this.exportJSON());
+    addListener("importLevelBtn", "click", () => {
+      const el = document.getElementById("importFileInput");
+      if (el) el.click();
     });
-    document.getElementById("importFileInput").addEventListener("change", (e) => this.importJSON(e));
-    document.getElementById("importPreviewCloseBtn").addEventListener("click", () => this.hideImportPreview());
-    document.getElementById("importPreviewCancelBtn").addEventListener("click", () => this.hideImportPreview());
-    document.getElementById("importPreviewConfirmBtn").addEventListener("click", () => this.applyImportedData());
-    document.getElementById("previewCopyBtn").addEventListener("click", () => this.copyFromPreview());
+    addListener("importFileInput", "change", (e) => this.importJSON(e));
+    addListener("importPreviewCloseBtn", "click", () => this.hideImportPreview());
+    addListener("importPreviewCancelBtn", "click", () => this.hideImportPreview());
+    addListener("importPreviewConfirmBtn", "click", () => this.applyImportedData());
+    addListener("previewCopyBtn", "click", () => this.copyFromPreview());
 
     document.getElementById("editorLevelName").addEventListener("input", (e) => {
       if (this.state) this.state.name = e.target.value;
@@ -4565,6 +4944,7 @@ const editor = {
 function renderCustomLevelCards() {
   const section = document.getElementById("customLevelsSection");
   const list = document.getElementById("customLevelList");
+  if (!section || !list) return;
   const levels = customLevelsStore.getAll();
 
   if (levels.length === 0) {
@@ -5158,6 +5538,11 @@ finish = function(success, message) {
 };
 
 function renderDailyChallengeCard() {
+  const levelSelect = document.getElementById("levelSelect");
+  if (!levelSelect) return;
+  const levelSelectHeader = levelSelect.querySelector(".level-select-header");
+  if (!levelSelectHeader) return;
+
   const dateStr = getDateString();
   const challenge = getTodayChallenge();
   if (!artifactTemplates[challenge.id]) {
@@ -5167,8 +5552,6 @@ function renderDailyChallengeCard() {
   const record = dailyChallengeStore.getRecord(dateStr);
   const streak = dailyChallengeStore.getStreak();
 
-  const levelSelect = document.getElementById("levelSelect");
-  const levelSelectHeader = levelSelect.querySelector(".level-select-header");
   let dailySection = document.getElementById("dailyChallengeSection");
 
   if (!dailySection) {

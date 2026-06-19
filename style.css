@@ -1142,6 +1142,253 @@ h2 {
   padding: 10px 0;
 }
 
+.stats-overview {
+  margin-bottom: 18px;
+}
+
+.stats-overview-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.stats-overview-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  background: #fff8e7;
+  border: 1px solid #c69a60;
+  border-radius: 8px;
+}
+
+.stats-card-icon {
+  font-size: 28px;
+  flex-shrink: 0;
+}
+
+.stats-card-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.stats-card-label {
+  font-size: 12px;
+  color: #7d4c21;
+  margin-bottom: 2px;
+}
+
+.stats-card-value {
+  font-size: 20px;
+  font-weight: 700;
+  color: #314c53;
+}
+
+.stats-level-filter {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.level-filter-btn {
+  background: #fff4d9;
+  color: #7d4c21;
+  border: 1px solid #c69a60;
+  font-weight: 600;
+  font-size: 13px;
+  padding: 6px 12px;
+  min-height: 32px;
+}
+
+.level-filter-btn:hover {
+  background: #f4e7c9;
+}
+
+.level-filter-btn.active {
+  background: #314c53;
+  color: #fff8e7;
+  border-color: #314c53;
+}
+
+.stats-level-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 500px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.stats-level-card {
+  background: #fff8e7;
+  border: 1px solid #c69a60;
+  border-radius: 8px;
+  padding: 14px 16px;
+  transition: box-shadow 0.2s ease;
+}
+
+.stats-level-card:hover {
+  box-shadow: 0 4px 12px rgba(49, 76, 83, 0.15);
+}
+
+.stats-level-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 10px;
+}
+
+.stats-level-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.stats-level-name {
+  font-weight: 700;
+  color: #314c53;
+  font-size: 16px;
+}
+
+.stats-level-category {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.category-official {
+  background: #314c53;
+  color: #fff8e7;
+}
+
+.category-custom {
+  background: #5c8a6e;
+  color: #fff8e7;
+}
+
+.category-daily {
+  background: #c47b3c;
+  color: #fff8e7;
+}
+
+.category-unknown {
+  background: #8b7355;
+  color: #fff8e7;
+}
+
+.stats-level-completions {
+  text-align: right;
+}
+
+.completions-count {
+  display: block;
+  font-size: 24px;
+  font-weight: 700;
+  color: #314c53;
+  line-height: 1;
+}
+
+.completions-label {
+  font-size: 12px;
+  color: #7d4c21;
+}
+
+.stats-rating-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  font-weight: 700;
+  font-size: 13px;
+  color: #fff8e7;
+}
+
+.stats-level-progress {
+  margin-bottom: 12px;
+}
+
+.progress-bar-bg {
+  width: 100%;
+  height: 6px;
+  background: #e7d4b1;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #c49b62, #314c53);
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.stats-level-details {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+
+.stats-detail-item {
+  text-align: center;
+  padding: 8px;
+  background: #fff4d9;
+  border-radius: 6px;
+}
+
+.stats-detail-full {
+  grid-column: 1 / -1;
+}
+
+.stats-detail-label {
+  display: block;
+  font-size: 11px;
+  color: #7d4c21;
+  margin-bottom: 3px;
+}
+
+.stats-detail-value {
+  font-size: 14px;
+  font-weight: 600;
+  color: #314c53;
+  word-break: break-word;
+}
+
+@media (max-width: 640px) {
+  .stats-overview-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .stats-level-details {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .stats-detail-full {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 480px) {
+  .stats-overview-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .stats-level-filter {
+    justify-content: flex-start;
+  }
+  
+  .level-filter-btn {
+    flex: 1;
+    min-width: calc(50% - 4px);
+    justify-content: center;
+  }
+}
+
 .secondary-btn {
   background: #8b7355;
 }
