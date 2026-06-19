@@ -5792,7 +5792,7 @@ const editor = {
   },
 
   renderEventWeights() {
-    const container = document.getElementById("editorEventWeights");
+    const container = document.getElementById("eventWeightList");
     if (!container) return;
     const currentLayer = this.getCurrentLayer();
     if (!currentLayer) return;
