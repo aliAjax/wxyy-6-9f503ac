@@ -127,76 +127,104 @@ const timelineRecorder = {
   },
 
   recordDig(cellIndex, foundPieceId, toolType) {
-    return this.record(TIMELINE_EVENT_TYPES.DIG, {
-      cellIndex,
-      foundPieceId,
-      toolType: toolType || "normal"
-    }, foundPieceId
-      ? `⛏ 挖到了碎片（${toolType || '手挖'}）`
-      : `⛏ 挖掘空槽（${toolType || '手挖'}）`);
+    return this.record(
+      TIMELINE_EVENT_TYPES.DIG,
+      {
+        cellIndex,
+        foundPieceId,
+        toolType: toolType || "normal"
+      },
+      foundPieceId ? `⛏ 挖到了碎片（${toolType || "手挖"}）` : `⛏ 挖掘空槽（${toolType || "手挖"}）`
+    );
   },
 
   recordToolUse(toolId, success, message) {
-    return this.record(TIMELINE_EVENT_TYPES.TOOL_USE, {
-      toolId,
-      success
-    }, `${TOOL_NAMES[toolId]?.icon || '🔧'} 使用${TOOL_NAMES[toolId]?.name || toolId}`);
+    return this.record(
+      TIMELINE_EVENT_TYPES.TOOL_USE,
+      {
+        toolId,
+        success
+      },
+      `${TOOL_NAMES[toolId]?.icon || "🔧"} 使用${TOOL_NAMES[toolId]?.name || toolId}`
+    );
   },
 
   recordEventTrigger(eventId, eventName, eventType, message, effect) {
-    return this.record(TIMELINE_EVENT_TYPES.EVENT_TRIGGER, {
-      eventId,
-      eventName,
-      eventType,
-      message,
-      effect: effect || {}
-    }, `${eventType === 'positive' ? '✨' : '⚡'} ${eventName}`);
+    return this.record(
+      TIMELINE_EVENT_TYPES.EVENT_TRIGGER,
+      {
+        eventId,
+        eventName,
+        eventType,
+        message,
+        effect: effect || {}
+      },
+      `${eventType === "positive" ? "✨" : "⚡"} ${eventName}`
+    );
   },
 
   recordPieceSpawn(pieceId, pieceLabel, initialPosition) {
     this._piecePositions.set(pieceId, initialPosition);
-    return this.record(TIMELINE_EVENT_TYPES.PIECE_SPAWN, {
-      pieceId,
-      pieceLabel,
-      position: initialPosition
-    }, `🧩 发现${pieceLabel}碎片`);
+    return this.record(
+      TIMELINE_EVENT_TYPES.PIECE_SPAWN,
+      {
+        pieceId,
+        pieceLabel,
+        position: initialPosition
+      },
+      `🧩 发现${pieceLabel}碎片`
+    );
   },
 
   recordPieceDrag(pieceId, fromPosition, toPosition) {
     this._piecePositions.set(pieceId, toPosition);
-    return this.record(TIMELINE_EVENT_TYPES.PIECE_DRAG, {
-      pieceId,
-      fromPosition,
-      toPosition
-    }, `✋ 移动碎片`);
+    return this.record(
+      TIMELINE_EVENT_TYPES.PIECE_DRAG,
+      {
+        pieceId,
+        fromPosition,
+        toPosition
+      },
+      `✋ 移动碎片`
+    );
   },
 
   recordPieceRotate(pieceId, fromAngle, toAngle) {
-    return this.record(TIMELINE_EVENT_TYPES.PIECE_ROTATE, {
-      pieceId,
-      fromAngle,
-      toAngle
-    }, `🔄 旋转碎片 ${fromAngle}° → ${toAngle}°`);
+    return this.record(
+      TIMELINE_EVENT_TYPES.PIECE_ROTATE,
+      {
+        pieceId,
+        fromAngle,
+        toAngle
+      },
+      `🔄 旋转碎片 ${fromAngle}° → ${toAngle}°`
+    );
   },
 
   recordPieceSnap(pieceId, pieceLabel, success, position) {
     if (success) {
       this._piecePositions.set(pieceId, position);
     }
-    return this.record(TIMELINE_EVENT_TYPES.PIECE_SNAP, {
-      pieceId,
-      pieceLabel,
-      success,
-      position
-    }, success
-      ? `✅ ${pieceLabel}贴合成功`
-      : `❌ ${pieceLabel}贴合失败`);
+    return this.record(
+      TIMELINE_EVENT_TYPES.PIECE_SNAP,
+      {
+        pieceId,
+        pieceLabel,
+        success,
+        position
+      },
+      success ? `✅ ${pieceLabel}贴合成功` : `❌ ${pieceLabel}贴合失败`
+    );
   },
 
   recordHintUse(cellIndex) {
-    return this.record(TIMELINE_EVENT_TYPES.HINT_USE, {
-      cellIndex
-    }, `💡 使用提示`);
+    return this.record(
+      TIMELINE_EVENT_TYPES.HINT_USE,
+      {
+        cellIndex
+      },
+      `💡 使用提示`
+    );
   },
 
   recordGameStart() {
@@ -204,11 +232,15 @@ const timelineRecorder = {
   },
 
   recordGameEnd(success, score, rating) {
-    return this.record(TIMELINE_EVENT_TYPES.GAME_END, {
-      success,
-      score,
-      rating
-    }, success ? "🏆 修复完成" : "⏹ 修复结束");
+    return this.record(
+      TIMELINE_EVENT_TYPES.GAME_END,
+      {
+        success,
+        score,
+        rating
+      },
+      success ? "🏆 修复完成" : "⏹ 修复结束"
+    );
   },
 
   getTimeline() {
@@ -253,7 +285,7 @@ const playbackManager = {
     document.getElementById("playbackSpeedBtn")?.addEventListener("click", () => this.cycleSpeed());
 
     document.querySelectorAll(".playback-tab-btn").forEach(btn => {
-      btn.addEventListener("click", (e) => {
+      btn.addEventListener("click", e => {
         const tab = e.currentTarget.dataset.playbackTab;
         this._switchTab(tab);
       });
@@ -265,13 +297,17 @@ const playbackManager = {
       btn.classList.toggle("active", btn.dataset.playbackTab === tabName);
     });
     document.querySelectorAll(".playback-tab-panel").forEach(panel => {
-      panel.classList.toggle("active", panel.id === `playback${tabName.charAt(0).toUpperCase() + tabName.slice(1)}Tab`);
+      panel.classList.toggle(
+        "active",
+        panel.id === `playback${tabName.charAt(0).toUpperCase() + tabName.slice(1)}Tab`
+      );
     });
   },
 
   _parsePosition(position) {
     if (!position) return { left: 0, top: 0, x: 0, y: 0 };
-    let left = 0, top = 0;
+    let left = 0,
+      top = 0;
     if (typeof position.left === "string") {
       left = parseFloat(position.left) || 0;
     } else if (typeof position.left === "number") {
@@ -497,7 +533,7 @@ const playbackManager = {
     const seconds = Math.floor(ms / 1000);
     const minutes = Math.floor(seconds / 60);
     const remainingSeconds = seconds % 60;
-    return `${minutes}:${String(remainingSeconds).padStart(2, '0')}`;
+    return `${minutes}:${String(remainingSeconds).padStart(2, "0")}`;
   },
 
   _updateStepInfo() {
@@ -533,9 +569,13 @@ const playbackManager = {
 
   _clearActiveHighlights() {
     document.querySelectorAll(".playback-cell.active").forEach(el => el.classList.remove("active"));
-    document.querySelectorAll(".playback-piece.active").forEach(el => el.classList.remove("active"));
+    document
+      .querySelectorAll(".playback-piece.active")
+      .forEach(el => el.classList.remove("active"));
     document.querySelectorAll(".playback-slot.active").forEach(el => el.classList.remove("active"));
-    document.querySelectorAll(".playback-tool-btn.active").forEach(el => el.classList.remove("active"));
+    document
+      .querySelectorAll(".playback-tool-btn.active")
+      .forEach(el => el.classList.remove("active"));
   },
 
   _updateStats() {
@@ -552,7 +592,9 @@ const playbackManager = {
     }
     if (digsEl) digsEl.textContent = this._playbackState.digs;
     if (progressEl) {
-      const progress = Math.round((this._playbackState.locked.size / this._template.pieceDefs.length) * 100);
+      const progress = Math.round(
+        (this._playbackState.locked.size / this._template.pieceDefs.length) * 100
+      );
       progressEl.textContent = `${progress}%`;
     }
   },
@@ -561,9 +603,10 @@ const playbackManager = {
     const fill = document.getElementById("playbackProgressFill");
     if (!fill || !this._timeline) return;
 
-    const progress = this._timeline.events.length > 0
-      ? ((this._currentStep + 1) / this._timeline.events.length) * 100
-      : 0;
+    const progress =
+      this._timeline.events.length > 0
+        ? ((this._currentStep + 1) / this._timeline.events.length) * 100
+        : 0;
     fill.style.width = `${Math.max(0, progress)}%`;
   },
 
@@ -646,7 +689,9 @@ const playbackManager = {
     const toolBtn = document.querySelector(`.playback-tool-btn[data-tool="${toolId}"]`);
 
     if (isForward && toolBtn) {
-      document.querySelectorAll(".playback-tool-btn.active").forEach(btn => btn.classList.remove("active"));
+      document
+        .querySelectorAll(".playback-tool-btn.active")
+        .forEach(btn => btn.classList.remove("active"));
       toolBtn.classList.add("active");
       this._playbackState.activeTool = toolId;
     }
@@ -1012,8 +1057,10 @@ const archive = {
           if (recordGoalsAchieved > existingGoalsAchieved) {
             bestByLevel[record.levelId] = record;
           } else if (recordGoalsAchieved === existingGoalsAchieved) {
-            const recordScore = record.finalScore !== undefined ? record.finalScore : record.completeness;
-            const existingScore = existing.finalScore !== undefined ? existing.finalScore : existing.completeness;
+            const recordScore =
+              record.finalScore !== undefined ? record.finalScore : record.completeness;
+            const existingScore =
+              existing.finalScore !== undefined ? existing.finalScore : existing.completeness;
             if (recordScore > existingScore) {
               bestByLevel[record.levelId] = record;
             } else if (recordScore === existingScore && record.timeUsed < existing.timeUsed) {
@@ -1051,12 +1098,37 @@ function renderArchiveStatsOverview() {
   overview.className = "stats-overview-grid";
 
   const cards = [
-    { label: "总完成次数", value: overallStats.totalCompletions, icon: "📊", class: "stat-completions" },
+    {
+      label: "总完成次数",
+      value: overallStats.totalCompletions,
+      icon: "📊",
+      class: "stat-completions"
+    },
     { label: "挑战关卡数", value: overallStats.uniqueLevels, icon: "🎯", class: "stat-levels" },
-    { label: "平均用时", value: overallStats.avgTime !== null ? `${overallStats.avgTime}秒` : "—", icon: "⏱️", class: "stat-time" },
-    { label: "平均挖掘", value: overallStats.avgDigs !== null ? `${overallStats.avgDigs}次` : "—", icon: "⛏️", class: "stat-digs" },
-    { label: "平均评分", value: overallStats.avgScore !== null ? overallStats.avgScore : "—", icon: "⭐", class: "stat-score" },
-    { label: "S/A评级", value: `${overallStats.sCount}S / ${overallStats.aCount}A`, icon: "🏆", class: "stat-ratings" }
+    {
+      label: "平均用时",
+      value: overallStats.avgTime !== null ? `${overallStats.avgTime}秒` : "—",
+      icon: "⏱️",
+      class: "stat-time"
+    },
+    {
+      label: "平均挖掘",
+      value: overallStats.avgDigs !== null ? `${overallStats.avgDigs}次` : "—",
+      icon: "⛏️",
+      class: "stat-digs"
+    },
+    {
+      label: "平均评分",
+      value: overallStats.avgScore !== null ? overallStats.avgScore : "—",
+      icon: "⭐",
+      class: "stat-score"
+    },
+    {
+      label: "S/A评级",
+      value: `${overallStats.sCount}S / ${overallStats.aCount}A`,
+      icon: "🏆",
+      class: "stat-ratings"
+    }
   ];
 
   for (const card of cards) {
@@ -1120,7 +1192,8 @@ function renderArchiveStatsLevelList() {
     }
 
     const maxCompletions = Math.max(...overallStats.levelStatsList.map(s => s.totalCompletions));
-    const progressPercent = maxCompletions > 0 ? Math.round((levelStat.totalCompletions / maxCompletions) * 100) : 0;
+    const progressPercent =
+      maxCompletions > 0 ? Math.round((levelStat.totalCompletions / maxCompletions) * 100) : 0;
 
     card.innerHTML = `
       <div class="stats-level-header">
@@ -1283,7 +1356,8 @@ function createRecordCard(record, showBadge = false) {
 
   if (record.toolsUsed !== undefined) {
     const tu = record.toolsUsed;
-    const anyUsed = (tu.probe || 0) > 0 || (tu.brush || 0) > 0 || (tu.compass || 0) > 0 || (tu.trowel || 0) > 0;
+    const anyUsed =
+      (tu.probe || 0) > 0 || (tu.brush || 0) > 0 || (tu.compass || 0) > 0 || (tu.trowel || 0) > 0;
     if (anyUsed) {
       const toolsDiv = document.createElement("div");
       toolsDiv.className = "record-tools";
@@ -1300,7 +1374,7 @@ function createRecordCard(record, showBadge = false) {
   if (record.keyEvents && record.keyEvents.length > 0) {
     const eventsDiv = document.createElement("div");
     eventsDiv.className = "record-events";
-    const eventList = record.keyEvents.map((e) => e.name).join(" · ");
+    const eventList = record.keyEvents.map(e => e.name).join(" · ");
     eventsDiv.innerHTML = `<span class="record-events-label">关键事件：</span>${eventList}`;
     card.appendChild(eventsDiv);
   }
@@ -1308,27 +1382,33 @@ function createRecordCard(record, showBadge = false) {
   if (record.goals && Object.keys(record.goals).length > 0) {
     const goalsDiv = document.createElement("div");
     goalsDiv.className = "record-goals";
-    const goalsList = Object.values(record.goals).map(goal => {
-      return `<span class="record-goal-item ${goal.achieved ? 'achieved' : 'not-achieved'}" title="${goal.description}">
-        ${goal.icon} ${goal.name}${goal.achieved ? ' ✓' : ' ✗'}
+    const goalsList = Object.values(record.goals)
+      .map(goal => {
+        return `<span class="record-goal-item ${goal.achieved ? "achieved" : "not-achieved"}" title="${goal.description}">
+        ${goal.icon} ${goal.name}${goal.achieved ? " ✓" : " ✗"}
       </span>`;
-    }).join("");
+      })
+      .join("");
     goalsDiv.innerHTML = `<span class="record-goals-label">🎯 修复目标 (${record.goalsAchieved || 0}/${record.goalsTotal || 0})：</span>${goalsList}`;
     card.appendChild(goalsDiv);
   }
 
-  const hasTimeline = record.timeline && record.timeline.events && Array.isArray(record.timeline.events) && record.timeline.events.length > 0;
+  const hasTimeline =
+    record.timeline &&
+    record.timeline.events &&
+    Array.isArray(record.timeline.events) &&
+    record.timeline.events.length > 0;
   const actionsDiv = document.createElement("div");
   actionsDiv.className = "record-actions";
 
   const playbackBtn = document.createElement("button");
   playbackBtn.className = "record-playback-btn";
-  playbackBtn.innerHTML = hasTimeline ? '▶ 回放过程' : '🔒 不可回放';
+  playbackBtn.innerHTML = hasTimeline ? "▶ 回放过程" : "🔒 不可回放";
   playbackBtn.disabled = !hasTimeline;
-  playbackBtn.title = hasTimeline ? '点击回放本局修复过程' : '该档案为旧版记录，不支持回放';
+  playbackBtn.title = hasTimeline ? "点击回放本局修复过程" : "该档案为旧版记录，不支持回放";
 
   if (hasTimeline) {
-    playbackBtn.addEventListener("click", (e) => {
+    playbackBtn.addEventListener("click", e => {
       e.stopPropagation();
       playbackManager.open(record);
     });
@@ -1360,7 +1440,7 @@ function renderRecentRecords() {
     return;
   }
 
-  records.forEach((record) => {
+  records.forEach(record => {
     recentRecordsEl.appendChild(createRecordCard(record));
   });
 }
@@ -1377,7 +1457,7 @@ function renderBestRecords() {
     return;
   }
 
-  records.forEach((record) => {
+  records.forEach(record => {
     bestRecordsEl.appendChild(createRecordCard(record, true));
   });
 }
@@ -1432,7 +1512,7 @@ function switchArchiveTab(tabName) {
 function renderLevelCards() {
   levelListEl.innerHTML = "";
   const bestRecords = archive.getBest();
-  Object.values(artifactTemplates).forEach((template) => {
+  Object.values(artifactTemplates).forEach(template => {
     const card = document.createElement("button");
     card.className = "level-card";
     card.dataset.level = template.id;
@@ -1484,7 +1564,9 @@ function freshState() {
     };
   }
   const toolsInit = { probe: 0, brush: 0, compass: 0, trowel: 0 };
-  Object.keys(toolkit).forEach(k => { toolsInit[k] = toolkit[k] || 0; });
+  Object.keys(toolkit).forEach(k => {
+    toolsInit[k] = toolkit[k] || 0;
+  });
   const toolsUsedInit = { probe: 0, brush: 0, compass: 0, trowel: 0 };
   const randomSeed = SEEDED_RANDOM.init();
   timelineRecorder.start(randomSeed);
@@ -1604,7 +1686,7 @@ function renderTarget() {
     targetEl.appendChild(centerKnob);
   }
 
-  template.pieceDefs.forEach((def) => {
+  template.pieceDefs.forEach(def => {
     const slot = document.createElement("div");
     slot.className = "slot";
     slot.dataset.pieceId = def.id;
@@ -1625,13 +1707,18 @@ function tryTriggerEvent() {
   const template = artifactTemplates[currentTemplate];
   const currentLayerId = state.currentLayerId;
   const events = Object.values(SITE_EVENTS);
-  const availableEvents = events.filter((evt) => {
+  const availableEvents = events.filter(evt => {
     const cooldown = state.eventCooldowns[evt.id] || 0;
     return cooldown <= 0;
   });
 
   for (const evt of availableEvents) {
-    const adjustedProb = LAYER_HELPERS.getEventProbability(template, currentLayerId, evt.id, evt.probability);
+    const adjustedProb = LAYER_HELPERS.getEventProbability(
+      template,
+      currentLayerId,
+      evt.id,
+      evt.probability
+    );
     if (SEEDED_RANDOM.next() < adjustedProb) {
       const before = {
         lockedCells: new Set(state.lockedCells),
@@ -1649,8 +1736,10 @@ function tryTriggerEvent() {
         if (addedLocked.length) effect.addedLockedCells = addedLocked;
         if (addedHinted.length) effect.addedHintedCells = addedHinted;
         if (addedProbeHints.length) effect.addedProbeHints = addedProbeHints;
-        if (state.toolWear !== before.toolWear) effect.toolWearDelta = state.toolWear - before.toolWear;
-        if (state.bonusScore !== before.bonusScore) effect.bonusScoreDelta = state.bonusScore - before.bonusScore;
+        if (state.toolWear !== before.toolWear)
+          effect.toolWearDelta = state.toolWear - before.toolWear;
+        if (state.bonusScore !== before.bonusScore)
+          effect.bonusScoreDelta = state.bonusScore - before.bonusScore;
 
         state.triggeredEvents.push({
           id: evt.id,
@@ -1678,7 +1767,7 @@ function tryTriggerEvent() {
 
         state.eventCooldowns[evt.id] = evt.cooldown;
 
-        Object.keys(state.eventCooldowns).forEach((id) => {
+        Object.keys(state.eventCooldowns).forEach(id => {
           if (id !== evt.id && state.eventCooldowns[id] > 0) {
             state.eventCooldowns[id] -= 1;
           }
@@ -1689,7 +1778,7 @@ function tryTriggerEvent() {
     }
   }
 
-  Object.keys(state.eventCooldowns).forEach((id) => {
+  Object.keys(state.eventCooldowns).forEach(id => {
     if (state.eventCooldowns[id] > 0) {
       state.eventCooldowns[id] -= 1;
     }
@@ -1840,7 +1929,11 @@ const tutorial = {
 
     this.waitingForAction = step.action !== null && step.action !== "snap";
     nextBtn.disabled = this.waitingForAction;
-    nextBtn.textContent = this.waitingForAction ? "请先完成操作" : (this.current === this.steps.length - 1 ? "完成" : "下一步");
+    nextBtn.textContent = this.waitingForAction
+      ? "请先完成操作"
+      : this.current === this.steps.length - 1
+        ? "完成"
+        : "下一步";
 
     tutorialTooltip.className = "tutorial-tooltip";
 
@@ -1927,25 +2020,25 @@ function init() {
     closeSettingsBtn.addEventListener("click", () => {
       settingsModal.classList.add("hidden");
     });
-    settingsModal.addEventListener("click", (e) => {
+    settingsModal.addEventListener("click", e => {
       if (e.target === settingsModal) settingsModal.classList.add("hidden");
     });
   }
   const settingEventAnim = document.getElementById("settingEventAnim");
   if (settingEventAnim) {
-    settingEventAnim.addEventListener("change", (e) => {
+    settingEventAnim.addEventListener("change", e => {
       gameSettings.set("eventAnim", e.target.checked);
     });
   }
   const settingVibration = document.getElementById("settingVibration");
   if (settingVibration) {
-    settingVibration.addEventListener("change", (e) => {
+    settingVibration.addEventListener("change", e => {
       gameSettings.set("vibration", e.target.checked);
     });
   }
   const settingAutoTutorial = document.getElementById("settingAutoTutorial");
   if (settingAutoTutorial) {
-    settingAutoTutorial.addEventListener("change", (e) => {
+    settingAutoTutorial.addEventListener("change", e => {
       gameSettings.set("autoTutorial", e.target.checked);
     });
   }
@@ -1955,7 +2048,7 @@ function init() {
   compassBtn.addEventListener("click", () => useTool("compass"));
   if (trowelBtn) trowelBtn.addEventListener("click", () => useTool("trowel"));
 
-  document.addEventListener("keydown", (e) => {
+  document.addEventListener("keydown", e => {
     if (!state || !state.running) return;
 
     if (e.key === "1") {
@@ -1994,8 +2087,12 @@ function init() {
     const activeEl = document.activeElement;
 
     if (activeEl && activeEl.classList.contains("cell")) {
-      if (e.key === "ArrowUp" || e.key === "ArrowDown" ||
-          e.key === "ArrowLeft" || e.key === "ArrowRight") {
+      if (
+        e.key === "ArrowUp" ||
+        e.key === "ArrowDown" ||
+        e.key === "ArrowLeft" ||
+        e.key === "ArrowRight"
+      ) {
         e.preventDefault();
         moveGridFocus(e.key);
       } else if (e.key === "Enter" || e.key === " ") {
@@ -2006,10 +2103,17 @@ function init() {
       return;
     }
 
-    if (activeEl && activeEl.classList.contains("piece") &&
-        !activeEl.classList.contains("locked")) {
-      if (e.key === "ArrowUp" || e.key === "ArrowDown" ||
-          e.key === "ArrowLeft" || e.key === "ArrowRight") {
+    if (
+      activeEl &&
+      activeEl.classList.contains("piece") &&
+      !activeEl.classList.contains("locked")
+    ) {
+      if (
+        e.key === "ArrowUp" ||
+        e.key === "ArrowDown" ||
+        e.key === "ArrowLeft" ||
+        e.key === "ArrowRight"
+      ) {
         e.preventDefault();
         movePieceWithKeyboard(activeEl, e.key);
       } else if (e.key === "r" || e.key === "R") {
@@ -2026,8 +2130,12 @@ function init() {
     }
 
     if (keyboardNav.activeRegion === "grid") {
-      if (e.key === "ArrowUp" || e.key === "ArrowDown" ||
-          e.key === "ArrowLeft" || e.key === "ArrowRight") {
+      if (
+        e.key === "ArrowUp" ||
+        e.key === "ArrowDown" ||
+        e.key === "ArrowLeft" ||
+        e.key === "ArrowRight"
+      ) {
         e.preventDefault();
         moveGridFocus(e.key);
       } else if (e.key === "Enter" || e.key === " ") {
@@ -2035,8 +2143,12 @@ function init() {
         dig(keyboardNav.focusedCellIndex);
       }
     } else if (keyboardNav.activeRegion === "pieces") {
-      if (e.key === "ArrowUp" || e.key === "ArrowDown" ||
-          e.key === "ArrowLeft" || e.key === "ArrowRight") {
+      if (
+        e.key === "ArrowUp" ||
+        e.key === "ArrowDown" ||
+        e.key === "ArrowLeft" ||
+        e.key === "ArrowRight"
+      ) {
         e.preventDefault();
         const pieces = keyboardNav.getUnlockedPieces();
         const currentPiece = pieces[keyboardNav.focusedPieceIndex];
@@ -2072,13 +2184,13 @@ function init() {
     tutorial.skip();
   });
 
-  document.querySelectorAll(".tab-btn").forEach((btn) => {
+  document.querySelectorAll(".tab-btn").forEach(btn => {
     btn.addEventListener("click", () => {
       switchArchiveTab(btn.dataset.tab);
     });
   });
 
-  document.querySelectorAll(".level-filter-btn").forEach((btn) => {
+  document.querySelectorAll(".level-filter-btn").forEach(btn => {
     btn.addEventListener("click", () => {
       currentStatsFilter = btn.dataset.filter;
       updateFilterButtons();
@@ -2086,15 +2198,15 @@ function init() {
     });
   });
 
-  archiveModal.addEventListener("click", (e) => {
+  archiveModal.addEventListener("click", e => {
     if (e.target === archiveModal) closeArchive();
   });
 
-  confirmModal.addEventListener("click", (e) => {
+  confirmModal.addEventListener("click", e => {
     if (e.target === confirmModal) closeConfirmModal();
   });
 
-  document.querySelectorAll(".mobile-tab-btn").forEach((btn) => {
+  document.querySelectorAll(".mobile-tab-btn").forEach(btn => {
     btn.addEventListener("click", () => {
       switchMobileTab(btn.dataset.tab);
     });
@@ -2102,17 +2214,21 @@ function init() {
 
   focusBtn.addEventListener("click", toggleFocusMode);
 
-  document.addEventListener("click", (e) => {
+  document.addEventListener("click", e => {
     if (!e.target.closest(".piece") && !e.target.closest(".piece-rotate-handle")) {
       deselectPiece();
     }
   });
 
-  document.addEventListener("touchstart", (e) => {
-    if (!e.target.closest(".piece") && !e.target.closest(".piece-rotate-handle")) {
-      deselectPiece();
-    }
-  }, { passive: true });
+  document.addEventListener(
+    "touchstart",
+    e => {
+      if (!e.target.closest(".piece") && !e.target.closest(".piece-rotate-handle")) {
+        deselectPiece();
+      }
+    },
+    { passive: true }
+  );
 
   let resizeTimeout;
   window.addEventListener("resize", () => {
@@ -2159,7 +2275,12 @@ function selectLevel(templateId, skipAutoTutorial = false) {
   }
   render();
 
-  if (!skipAutoTutorial && gameSettings.get("autoTutorial") && !tutorial.isDone() && !tutorial.active) {
+  if (
+    !skipAutoTutorial &&
+    gameSettings.get("autoTutorial") &&
+    !tutorial.isDone() &&
+    !tutorial.active
+  ) {
     setTimeout(() => tutorial.start(), 400);
   }
 }
@@ -2203,7 +2324,7 @@ function renderToolkitSelector(template, isLocked, isPractice) {
   previewToolsEl.innerHTML = "";
   const toolPoints = template.toolPoints || 0;
   let toolkit;
-  if (template.toolCounts && (template.isDailyChallenge && !isPractice)) {
+  if (template.toolCounts && template.isDailyChallenge && !isPractice) {
     toolkit = { ...template.toolCounts };
   } else {
     toolkit = currentPreviewToolkit || getDefaultToolkit(template);
@@ -2217,7 +2338,7 @@ function renderToolkitSelector(template, isLocked, isPractice) {
   const leftInfo = document.createElement("div");
   leftInfo.className = "toolkit-header-info";
   leftInfo.innerHTML = `<span class="toolkit-points-label">工具点数：</span>
-    <span class="toolkit-points-value ${cost > toolPoints && !isPractice ? 'over' : ''}">${cost}</span>
+    <span class="toolkit-points-value ${cost > toolPoints && !isPractice ? "over" : ""}">${cost}</span>
     <span class="toolkit-points-sep">/</span>
     <span class="toolkit-points-max">${toolPoints}</span>`;
 
@@ -2241,7 +2362,7 @@ function renderToolkitSelector(template, isLocked, isPractice) {
     const item = document.createElement("div");
     item.className = "toolkit-item";
 
-    const canInc = !isLocked && (isPractice || (cost + tool.cost) <= toolPoints);
+    const canInc = !isLocked && (isPractice || cost + tool.cost <= toolPoints);
     const canDec = !isLocked && count > 0;
 
     item.innerHTML = `
@@ -2256,9 +2377,9 @@ function renderToolkitSelector(template, isLocked, isPractice) {
         </div>
       </div>
       <div class="toolkit-item-controls">
-        <button type="button" class="toolkit-btn minus" data-tool="${toolId}" ${canDec ? '' : 'disabled'}>−</button>
+        <button type="button" class="toolkit-btn minus" data-tool="${toolId}" ${canDec ? "" : "disabled"}>−</button>
         <span class="toolkit-item-count">${count}</span>
-        <button type="button" class="toolkit-btn plus" data-tool="${toolId}" ${canInc ? '' : 'disabled'}>+</button>
+        <button type="button" class="toolkit-btn plus" data-tool="${toolId}" ${canInc ? "" : "disabled"}>+</button>
       </div>
     `;
     toolList.appendChild(item);
@@ -2268,8 +2389,8 @@ function renderToolkitSelector(template, isLocked, isPractice) {
   const resetRow = document.createElement("div");
   resetRow.className = "toolkit-actions-row";
   resetRow.innerHTML = `
-    <button type="button" class="toolkit-reset-btn" ${isLocked ? 'disabled' : ''}>↺ 恢复默认</button>
-    <button type="button" class="toolkit-clear-btn" ${isLocked ? 'disabled' : ''}>✕ 清空全部</button>
+    <button type="button" class="toolkit-reset-btn" ${isLocked ? "disabled" : ""}>↺ 恢复默认</button>
+    <button type="button" class="toolkit-clear-btn" ${isLocked ? "disabled" : ""}>✕ 清空全部</button>
   `;
   previewToolsEl.appendChild(resetRow);
 
@@ -2326,7 +2447,8 @@ function showLevelPreview(templateId, isDaily = false, isPractice = false) {
 
   previewNameEl.textContent = `${template.name}修复`;
   previewDifficultyEl.textContent = template.difficulty || "自定义";
-  previewDescriptionEl.textContent = template.description || "探索古老文物的奥秘，将散落的碎片逐一拼合，重现历史的光辉。";
+  previewDescriptionEl.textContent =
+    template.description || "探索古老文物的奥秘，将散落的碎片逐一拼合，重现历史的光辉。";
 
   previewPieceCountEl.textContent = `${template.pieceDefs.length} 片`;
   previewTimeLimitEl.textContent = `${template.timeLimit} 秒`;
@@ -2512,7 +2634,9 @@ function switchLayer(layerId) {
   state.probeHints = state.layerProbeHints.get(layerId);
   keyboardNav.focusedCellIndex = 0;
 
-  addLog(`切换到「${targetLayer.name}」。${targetLayer.description ? `（${targetLayer.description}）` : ""}`);
+  addLog(
+    `切换到「${targetLayer.name}」。${targetLayer.description ? `（${targetLayer.description}）` : ""}`
+  );
   cancelToolMode(false);
   render();
 }
@@ -2556,7 +2680,11 @@ function renderLayerTabs() {
     tab.dataset.layerId = layer.id;
 
     const isAccessible = LAYER_HELPERS.isLayerAccessible(template, layer.id, state.layerDug);
-    const isCleared = LAYER_HELPERS.isLayerCleared(template, layer.id, state.layerDug.get(layer.id));
+    const isCleared = LAYER_HELPERS.isLayerCleared(
+      template,
+      layer.id,
+      state.layerDug.get(layer.id)
+    );
     const isActive = state.currentLayerId === layer.id;
 
     if (isActive) tab.classList.add("active");
@@ -2564,9 +2692,9 @@ function renderLayerTabs() {
     if (isCleared) tab.classList.add("cleared-layer");
 
     tab.innerHTML = `
-      <span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:${layer.color || '#d4b896'};border:1px solid #5c3a1a;"></span>
+      <span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:${layer.color || "#d4b896"};border:1px solid #5c3a1a;"></span>
       <span>${idx + 1}. ${layer.name}</span>
-      ${!isAccessible ? '🔒' : ''}
+      ${!isAccessible ? "🔒" : ""}
     `;
 
     tab.addEventListener("click", () => switchLayer(layer.id));
@@ -2614,8 +2742,10 @@ function dig(index) {
     state.found.add(id);
     state.layerRecords[currentLayerId].correctDigs += 1;
     state.layerRecords[currentLayerId].pieces.push(id);
-    const pieceDef = template.pieceDefs.find((p) => p.id === id);
-    addLog(`挖到了${pieceDef ? pieceDef.label : id}${template.pieceName}（出自${LAYER_HELPERS.getCurrentLayer(template, currentLayerId).name}）。`);
+    const pieceDef = template.pieceDefs.find(p => p.id === id);
+    addLog(
+      `挖到了${pieceDef ? pieceDef.label : id}${template.pieceName}（出自${LAYER_HELPERS.getCurrentLayer(template, currentLayerId).name}）。`
+    );
     timelineRecorder.recordDig(index, id, "normal");
     spawnPiece(id);
     triggerVibration([20, 40, 20]);
@@ -2634,20 +2764,20 @@ function updateCompass(piece, clientX, clientY) {
 
   const template = artifactTemplates[currentTemplate];
   const id = piece.dataset.id;
-  const def = template.pieceDefs.find((item) => item.id === id);
+  const def = template.pieceDefs.find(item => item.id === id);
   if (!def) return;
 
   const pieceRect = piece.getBoundingClientRect();
   const targetRect = targetEl.getBoundingClientRect();
   const centerX = pieceRect.left + pieceRect.width / 2;
   const centerY = pieceRect.top + pieceRect.height / 2;
-  const targetX = targetRect.left + targetRect.width * (def.slot.x + 18) / 100;
-  const targetY = targetRect.top + targetRect.height * (def.slot.y + 18) / 100;
+  const targetX = targetRect.left + (targetRect.width * (def.slot.x + 18)) / 100;
+  const targetY = targetRect.top + (targetRect.height * (def.slot.y + 18)) / 100;
 
   const dx = targetX - centerX;
   const dy = targetY - centerY;
   const distance = Math.hypot(dx, dy);
-  const angle = Math.atan2(dy, dx) * 180 / Math.PI + 90;
+  const angle = (Math.atan2(dy, dx) * 180) / Math.PI + 90;
 
   compassIndicator.classList.remove("hidden");
   compassIndicator.style.left = `${clientX}px`;
@@ -2688,7 +2818,9 @@ function useHint() {
       const lBuried = LAYER_HELPERS.getLayerBuried(template, layer.id);
       const lDug = state.layerDug.get(layer.id) || new Set();
       const lHinted = state.layerHintedCells.get(layer.id) || new Set();
-      const lHidden = Object.keys(lBuried).map(Number).filter(i => !lDug.has(i) && !lHinted.has(i));
+      const lHidden = Object.keys(lBuried)
+        .map(Number)
+        .filter(i => !lDug.has(i) && !lHinted.has(i));
       if (lHidden.length > 0) {
         addLog(`当前层没有可提示的碎片，但其他层还有未发掘的碎片。可以尝试切换地层。`);
         foundHint = true;
@@ -2704,7 +2836,9 @@ function useHint() {
   state.hintedCells.add(targetIdx);
   state.hintsUsed += 1;
   const def = template.pieceDefs.find(p => p.id === buried[targetIdx]);
-  addLog(`提示：${def ? def.label : "某件"}${template.pieceName}的位置已标记（位于${LAYER_HELPERS.getCurrentLayer(template, currentLayerId).name}）。`);
+  addLog(
+    `提示：${def ? def.label : "某件"}${template.pieceName}的位置已标记（位于${LAYER_HELPERS.getCurrentLayer(template, currentLayerId).name}）。`
+  );
   timelineRecorder.recordHintUse(targetIdx);
   render();
 }
@@ -2786,8 +2920,10 @@ function brushDig(index) {
     state.found.add(id);
     state.layerRecords[currentLayerId].correctDigs += 1;
     state.layerRecords[currentLayerId].pieces.push(id);
-    const pieceDef = template.pieceDefs.find((p) => p.id === id);
-    addLog(`[刷子] 安全清理出${pieceDef ? pieceDef.label : id}${template.pieceName}（出自${LAYER_HELPERS.getCurrentLayer(template, currentLayerId).name}）。`);
+    const pieceDef = template.pieceDefs.find(p => p.id === id);
+    addLog(
+      `[刷子] 安全清理出${pieceDef ? pieceDef.label : id}${template.pieceName}（出自${LAYER_HELPERS.getCurrentLayer(template, currentLayerId).name}）。`
+    );
     timelineRecorder.recordDig(index, id, "brush");
     spawnPiece(id);
     tutorial.notifyAction("dig");
@@ -2821,8 +2957,10 @@ function trowelDig(index) {
     state.found.add(id);
     state.layerRecords[currentLayerId].correctDigs += 1;
     state.layerRecords[currentLayerId].pieces.push(id);
-    const pieceDef = template.pieceDefs.find((p) => p.id === id);
-    addLog(`[小手铲] 精确挖掘出${pieceDef ? pieceDef.label : id}${template.pieceName}（出自${LAYER_HELPERS.getCurrentLayer(template, currentLayerId).name}）！`);
+    const pieceDef = template.pieceDefs.find(p => p.id === id);
+    addLog(
+      `[小手铲] 精确挖掘出${pieceDef ? pieceDef.label : id}${template.pieceName}（出自${LAYER_HELPERS.getCurrentLayer(template, currentLayerId).name}）！`
+    );
     timelineRecorder.recordDig(index, id, "trowel");
     spawnPiece(id);
     tutorial.notifyAction("dig");
@@ -2839,7 +2977,7 @@ function trowelDig(index) {
 function spawnPiece(id) {
   if (document.querySelector(`[data-id="${id}"]`)) return;
   const template = artifactTemplates[currentTemplate];
-  const def = template.pieceDefs.find((piece) => piece.id === id);
+  const def = template.pieceDefs.find(piece => piece.id === id);
   const style = template.piece.style;
   const piece = document.createElement("div");
   piece.className = "piece";
@@ -2849,7 +2987,10 @@ function spawnPiece(id) {
   piece.style.setProperty("--piece-rotation", `${def.initialAngle}deg`);
   piece.tabIndex = 0;
   piece.setAttribute("role", "button");
-  piece.setAttribute("aria-label", `${def.label}${template.pieceName}，角度${def.initialAngle}度，按方向键移动，R键旋转，空格键尝试贴合`);
+  piece.setAttribute(
+    "aria-label",
+    `${def.label}${template.pieceName}，角度${def.initialAngle}度，按方向键移动，R键旋转，空格键尝试贴合`
+  );
   piece.setAttribute("aria-grabbed", "false");
   piece.style.width = `${style.width}px`;
   piece.style.height = `${style.height}px`;
@@ -2888,15 +3029,19 @@ function spawnPiece(id) {
   const rotateHandle = document.createElement("div");
   rotateHandle.className = "piece-rotate-handle";
   rotateHandle.textContent = "↻";
-  rotateHandle.addEventListener("pointerdown", (e) => {
+  rotateHandle.addEventListener("pointerdown", e => {
     e.stopPropagation();
     rotatePiece(piece);
   });
-  rotateHandle.addEventListener("touchstart", (e) => {
-    e.stopPropagation();
-    e.preventDefault();
-    rotatePiece(piece);
-  }, { passive: false });
+  rotateHandle.addEventListener(
+    "touchstart",
+    e => {
+      e.stopPropagation();
+      e.preventDefault();
+      rotatePiece(piece);
+    },
+    { passive: false }
+  );
   piece.appendChild(rotateHandle);
 
   const labelSpan = document.createElement("span");
@@ -2916,12 +3061,16 @@ function spawnPiece(id) {
     const pieces = keyboardNav.getUnlockedPieces();
     keyboardNav.focusedPieceIndex = pieces.indexOf(piece);
   });
-  piece.addEventListener("keydown", (e) => {
+  piece.addEventListener("keydown", e => {
     if (piece.classList.contains("locked")) return;
     const target = e.currentTarget;
 
-    if (e.key === "ArrowLeft" || e.key === "ArrowRight" ||
-        e.key === "ArrowUp" || e.key === "ArrowDown") {
+    if (
+      e.key === "ArrowLeft" ||
+      e.key === "ArrowRight" ||
+      e.key === "ArrowUp" ||
+      e.key === "ArrowDown"
+    ) {
       e.preventDefault();
       e.stopPropagation();
       movePieceWithKeyboard(target, e.key);
@@ -2997,7 +3146,10 @@ function movePieceWithKeyboard(piece, direction) {
 
   selectPiece(piece);
   updateSnapFeedback(piece);
-  piece.setAttribute("aria-label", `${piece.dataset.label || '碎片'}，位置(${Math.round(left)}, ${Math.round(top)})，角度${piece.dataset.angle}度，按方向键移动，R键旋转，空格键尝试贴合`);
+  piece.setAttribute(
+    "aria-label",
+    `${piece.dataset.label || "碎片"}，位置(${Math.round(left)}, ${Math.round(top)})，角度${piece.dataset.angle}度，按方向键移动，R键旋转，空格键尝试贴合`
+  );
 }
 
 function moveGridFocus(direction) {
@@ -3167,8 +3319,11 @@ function endDrag(event) {
     top: piece.style.top
   };
 
-  if (fromPosition && pieceId &&
-      (fromPosition.left !== toPosition.left || fromPosition.top !== toPosition.top)) {
+  if (
+    fromPosition &&
+    pieceId &&
+    (fromPosition.left !== toPosition.left || fromPosition.top !== toPosition.top)
+  ) {
     timelineRecorder.recordPieceDrag(pieceId, fromPosition, toPosition);
   }
 
@@ -3200,7 +3355,10 @@ function rotatePiece(piece) {
   tutorial.notifyAction("rotate");
   selectPiece(piece);
   updateSnapFeedback(piece);
-  piece.setAttribute("aria-label", `${piece.dataset.label || '碎片'}，当前角度${piece.dataset.angle}度，按方向键移动，R键旋转，空格键尝试贴合`);
+  piece.setAttribute(
+    "aria-label",
+    `${piece.dataset.label || "碎片"}，当前角度${piece.dataset.angle}度，按方向键移动，R键旋转，空格键尝试贴合`
+  );
 
   if (pieceId) {
     timelineRecorder.recordPieceRotate(pieceId, fromAngle, toAngle);
@@ -3225,15 +3383,15 @@ function deselectPiece() {
 function updateSnapFeedback(piece) {
   const template = artifactTemplates[currentTemplate];
   const id = piece.dataset.id;
-  const def = template.pieceDefs.find((item) => item.id === id);
+  const def = template.pieceDefs.find(item => item.id === id);
   if (!def) return;
 
   const pieceRect = piece.getBoundingClientRect();
   const targetRect = targetEl.getBoundingClientRect();
   const centerX = pieceRect.left + pieceRect.width / 2;
   const centerY = pieceRect.top + pieceRect.height / 2;
-  const targetX = targetRect.left + targetRect.width * (def.slot.x + 18) / 100;
-  const targetY = targetRect.top + targetRect.height * (def.slot.y + 18) / 100;
+  const targetX = targetRect.left + (targetRect.width * (def.slot.x + 18)) / 100;
+  const targetY = targetRect.top + (targetRect.height * (def.slot.y + 18)) / 100;
   const distance = Math.hypot(centerX - targetX, centerY - targetY);
   const snapRadius = template.snapRadius;
 
@@ -3249,10 +3407,10 @@ function updateSnapFeedback(piece) {
 }
 
 function clearSnapFeedback() {
-  document.querySelectorAll(".piece.near-slot").forEach((p) => {
+  document.querySelectorAll(".piece.near-slot").forEach(p => {
     p.classList.remove("near-slot");
   });
-  document.querySelectorAll(".slot.highlight").forEach((s) => {
+  document.querySelectorAll(".slot.highlight").forEach(s => {
     s.classList.remove("highlight");
   });
 }
@@ -3287,7 +3445,7 @@ function startTwoFingerRotate(event, piece) {
   const dx = touch2.clientX - touch1.clientX;
   const dy = touch2.clientY - touch1.clientY;
   gestureState.initialDistance = Math.hypot(dx, dy);
-  gestureState.initialAngle = Math.atan2(dy, dx) * 180 / Math.PI;
+  gestureState.initialAngle = (Math.atan2(dy, dx) * 180) / Math.PI;
   gestureState.pieceAngle = Number(piece.dataset.angle) || 0;
   gestureState.active = true;
   gestureState.piece = piece;
@@ -3309,7 +3467,7 @@ function handleTwoFingerMove(event) {
 
   const dx = touch2.clientX - touch1.clientX;
   const dy = touch2.clientY - touch1.clientY;
-  const currentAngle = Math.atan2(dy, dx) * 180 / Math.PI;
+  const currentAngle = (Math.atan2(dy, dx) * 180) / Math.PI;
 
   let angleDiff = currentAngle - gestureState.initialAngle;
   let newAngle = gestureState.pieceAngle + angleDiff;
@@ -3334,7 +3492,7 @@ function handleTwoFingerEnd() {
 function switchMobileTab(tabName) {
   currentMobileTab = tabName;
 
-  document.querySelectorAll(".mobile-tab-btn").forEach((btn) => {
+  document.querySelectorAll(".mobile-tab-btn").forEach(btn => {
     const isActive = btn.dataset.tab === tabName;
     btn.classList.toggle("active", isActive);
     btn.setAttribute("aria-selected", isActive);
@@ -3362,7 +3520,7 @@ function switchMobileTab(tabName) {
 function setupMobileTabKeyboard() {
   const tabs = document.querySelectorAll(".mobile-tab-btn");
   tabs.forEach((tab, index) => {
-    tab.addEventListener("keydown", (e) => {
+    tab.addEventListener("keydown", e => {
       const tabsArray = Array.from(tabs);
       let newIndex = index;
 
@@ -3464,21 +3622,22 @@ function applyRotation(piece) {
 function trySnap(piece) {
   const template = artifactTemplates[currentTemplate];
   const id = piece.dataset.id;
-  const def = template.pieceDefs.find((item) => item.id === id);
+  const def = template.pieceDefs.find(item => item.id === id);
   const pieceRect = piece.getBoundingClientRect();
   const targetRect = targetEl.getBoundingClientRect();
   const centerX = pieceRect.left + pieceRect.width / 2;
   const centerY = pieceRect.top + pieceRect.height / 2;
-  const targetX = targetRect.left + targetRect.width * (def.slot.x + 18) / 100;
-  const targetY = targetRect.top + targetRect.height * (def.slot.y + 18) / 100;
+  const targetX = targetRect.left + (targetRect.width * (def.slot.x + 18)) / 100;
+  const targetY = targetRect.top + (targetRect.height * (def.slot.y + 18)) / 100;
   const distance = Math.hypot(centerX - targetX, centerY - targetY);
   const angleOk = Number(piece.dataset.angle) === def.angle;
   const snapRadius = template.snapRadius;
 
   if (distance < snapRadius && angleOk) {
     const benchRect = piecesEl.getBoundingClientRect();
-    const targetRelativeX = targetRect.left - benchRect.left + targetRect.width * def.slot.x / 100;
-    const targetRelativeY = targetRect.top - benchRect.top + targetRect.height * def.slot.y / 100;
+    const targetRelativeX =
+      targetRect.left - benchRect.left + (targetRect.width * def.slot.x) / 100;
+    const targetRelativeY = targetRect.top - benchRect.top + (targetRect.height * def.slot.y) / 100;
 
     piece.classList.add("snapping");
     piece.style.left = `${targetRelativeX}px`;
@@ -3531,7 +3690,10 @@ function trySnap(piece) {
     addLog("角度不对，按R键可以旋转碎片。");
     piece.classList.add("shake");
     piece.setAttribute("aria-live", "assertive");
-    piece.setAttribute("aria-label", `${def.label}角度不对，当前${piece.dataset.angle}度，目标${def.angle}度`);
+    piece.setAttribute(
+      "aria-label",
+      `${def.label}角度不对，当前${piece.dataset.angle}度，目标${def.angle}度`
+    );
     timelineRecorder.recordPieceSnap(id, def.label, false, {
       left: piece.style.left,
       top: piece.style.top
@@ -3543,7 +3705,10 @@ function trySnap(piece) {
     addLog("位置不对，请移到目标轮廓附近再尝试贴合。角度不对，按R键可以旋转碎片。");
     piece.classList.add("shake");
     piece.setAttribute("aria-live", "assertive");
-    piece.setAttribute("aria-label", `${def.label}位置不对且角度不对，当前${piece.dataset.angle}度，目标${def.angle}度`);
+    piece.setAttribute(
+      "aria-label",
+      `${def.label}位置不对且角度不对，当前${piece.dataset.angle}度，目标${def.angle}度`
+    );
     timelineRecorder.recordPieceSnap(id, def.label, false, {
       left: piece.style.left,
       top: piece.style.top
@@ -3572,7 +3737,9 @@ function buildLayerAccuracyHtml(layerAccuracy) {
   if (!layerAccuracy || !layerAccuracy.isMultiLayer || layerAccuracy.layerResults.length <= 1) {
     return "";
   }
-  const itemsHtml = layerAccuracy.layerResults.map((lr) => `
+  const itemsHtml = layerAccuracy.layerResults
+    .map(
+      lr => `
     <div class="layer-accuracy-item">
       <span class="layer-color-dot" style="background:${lr.layerColor}"></span>
       <span class="layer-name">${lr.layerName}</span>
@@ -3582,7 +3749,9 @@ function buildLayerAccuracyHtml(layerAccuracy) {
       </div>
       <span class="layer-accuracy-score" style="color:${getScoreColor(lr.layerScore)}">${lr.layerScore}</span>
     </div>
-  `).join("");
+  `
+    )
+    .join("");
 
   return `
     <div class="settlement-layer-accuracy">
@@ -3609,7 +3778,7 @@ function finish(success, message) {
     eventsHtml = `<div class="result-events">
       <h3>本轮关键事件</h3>
       <ul>`;
-    state.keyEvents.forEach((evt) => {
+    state.keyEvents.forEach(evt => {
       const typeClass = evt.type === "positive" ? "event-positive" : "event-negative";
       const icon = evt.type === "positive" ? "✦" : "⚡";
       eventsHtml += `<li class="${typeClass}"><span class="event-icon">${icon}</span>${evt.message}</li>`;
@@ -3627,16 +3796,20 @@ function finish(success, message) {
       <div class="settlement-goals">
         <h3>🎯 修复目标 <span class="goals-progress">(${achievedGoalsCount}/${goalsCount})</span></h3>
         <div class="settlement-goals-list">
-          ${Object.values(goalResults).map(goal => `
-            <div class="settlement-goal-item ${goal.achieved ? 'achieved' : 'not-achieved'}">
+          ${Object.values(goalResults)
+            .map(
+              goal => `
+            <div class="settlement-goal-item ${goal.achieved ? "achieved" : "not-achieved"}">
               <span class="settlement-goal-icon">${goal.icon}</span>
               <div class="settlement-goal-info">
                 <span class="settlement-goal-name">${goal.name}</span>
                 <span class="settlement-goal-desc">${goal.description}</span>
               </div>
-              <span class="settlement-goal-status">${goal.achieved ? '✓ 达成' : '✗ 未达成'}</span>
+              <span class="settlement-goal-status">${goal.achieved ? "✓ 达成" : "✗ 未达成"}</span>
             </div>
-          `).join('')}
+          `
+            )
+            .join("")}
         </div>
       </div>
     `;
@@ -3687,12 +3860,16 @@ function finish(success, message) {
             <div class="score-bar"><div class="score-bar-fill" style="width:${scores.toolScore}%;background:${getScoreColor(scores.toolScore)}"></div></div>
             <div class="score-value" style="color:${getScoreColor(scores.toolScore)}">${scores.toolScore}</div>
           </div>
-          ${scores.layerAccuracy.isMultiLayer ? `
+          ${
+            scores.layerAccuracy.isMultiLayer
+              ? `
           <div class="settlement-score-item">
             <div class="score-label">层位记录</div>
             <div class="score-bar"><div class="score-bar-fill" style="width:${scores.layerScore}%;background:${getScoreColor(scores.layerScore)}"></div></div>
             <div class="score-value" style="color:${getScoreColor(scores.layerScore)}">${scores.layerScore}</div>
-          </div>` : ''}
+          </div>`
+              : ""
+          }
         </div>
         ${buildLayerAccuracyHtml(scores.layerAccuracy)}
         <div class="settlement-tools-used">
@@ -3708,7 +3885,8 @@ function finish(success, message) {
     const record = {
       levelId: currentTemplate,
       levelName: template.name,
-      timeUsed: state.elapsedTime !== undefined ? state.elapsedTime : (template.timeLimit - state.timeLeft),
+      timeUsed:
+        state.elapsedTime !== undefined ? state.elapsedTime : template.timeLimit - state.timeLeft,
       digs: state.digs,
       completeness: completeness,
       finalScore: scores.totalScore,
@@ -3773,12 +3951,16 @@ function finish(success, message) {
             <div class="score-bar"><div class="score-bar-fill" style="width:${scores.toolScore}%;background:${getScoreColor(scores.toolScore)}"></div></div>
             <div class="score-value" style="color:${getScoreColor(scores.toolScore)}">${scores.toolScore}</div>
           </div>
-          ${scores.layerAccuracy.isMultiLayer ? `
+          ${
+            scores.layerAccuracy.isMultiLayer
+              ? `
           <div class="settlement-score-item">
             <div class="score-label">层位记录</div>
             <div class="score-bar"><div class="score-bar-fill" style="width:${scores.layerScore}%;background:${getScoreColor(scores.layerScore)}"></div></div>
             <div class="score-value" style="color:${getScoreColor(scores.layerScore)}">${scores.layerScore}</div>
-          </div>` : ''}
+          </div>`
+              : ""
+          }
         </div>
         ${buildLayerAccuracyHtml(scores.layerAccuracy)}
         <div class="settlement-tools-used">
@@ -3794,7 +3976,8 @@ function finish(success, message) {
     const record = {
       levelId: currentTemplate,
       levelName: template.name,
-      timeUsed: state.elapsedTime !== undefined ? state.elapsedTime : (template.timeLimit - state.timeLeft),
+      timeUsed:
+        state.elapsedTime !== undefined ? state.elapsedTime : template.timeLimit - state.timeLeft,
       digs: state.digs,
       completeness: completeness,
       finalScore: scores.totalScore,
@@ -3821,7 +4004,7 @@ function finish(success, message) {
   }
 
   resultEl.innerHTML = `<h2>${message}</h2>
-    <p>${success ? "通关" : "结束"}：${template.name}修复任务 · 用时${state.elapsedTime !== undefined ? state.elapsedTime : (template.timeLimit - state.timeLeft)}秒 · 挖掘${state.digs}次 · 完整度${completeness}%。</p>
+    <p>${success ? "通关" : "结束"}：${template.name}修复任务 · 用时${state.elapsedTime !== undefined ? state.elapsedTime : template.timeLimit - state.timeLeft}秒 · 挖掘${state.digs}次 · 完整度${completeness}%。</p>
     ${eventsHtml}
     ${settlementHtml}`;
   resultEl.classList.remove("hidden");
@@ -3973,7 +4156,10 @@ function renderGrid() {
   gridEl.style.setProperty("--layer-color", currentLayer.color || "#c69a60");
   gridEl.style.setProperty("--layer-bg", adjustBrightness(currentLayer.color || "#f5e6c8", 30));
   gridEl.style.setProperty("--cell-bg", currentLayer.color || "#e7d4b1");
-  gridEl.style.setProperty("--cell-hover-bg", adjustBrightness(currentLayer.color || "#d4b896", -15));
+  gridEl.style.setProperty(
+    "--cell-hover-bg",
+    adjustBrightness(currentLayer.color || "#d4b896", -15)
+  );
 
   for (let i = 0; i < gridSize; i += 1) {
     const cell = document.createElement("button");
@@ -3997,10 +4183,16 @@ function renderGrid() {
 
     if (state.dug.has(i)) {
       cell.textContent = buried[i] ? template.pieceName : "土";
-      cell.setAttribute("aria-label", `${currentLayer.name}第${row + 1}行第${col + 1}列，已挖掘，${buried[i] ? "发现" + template.pieceName : "只有土"}`);
+      cell.setAttribute(
+        "aria-label",
+        `${currentLayer.name}第${row + 1}行第${col + 1}列，已挖掘，${buried[i] ? "发现" + template.pieceName : "只有土"}`
+      );
     } else if (state.lockedCells.has(i)) {
       cell.textContent = "⚠";
-      cell.setAttribute("aria-label", `${currentLayer.name}第${row + 1}行第${col + 1}列，已锁定，无法挖掘`);
+      cell.setAttribute(
+        "aria-label",
+        `${currentLayer.name}第${row + 1}行第${col + 1}列，已锁定，无法挖掘`
+      );
     } else if (state.hintedCells.has(i)) {
       cell.textContent = "?";
       cell.setAttribute("aria-label", `${currentLayer.name}第${row + 1}行第${col + 1}列，提示位置`);
@@ -4047,19 +4239,24 @@ function adjustBrightness(hex, percent) {
   const num = parseInt(hex.replace("#", ""), 16);
   const amt = Math.round(2.55 * percent);
   const R = (num >> 16) + amt;
-  const G = (num >> 8 & 0x00FF) + amt;
-  const B = (num & 0x0000FF) + amt;
-  return "#" + (
-    0x1000000 +
-    (R < 255 ? R < 1 ? 0 : R : 255) * 0x10000 +
-    (G < 255 ? G < 1 ? 0 : G : 255) * 0x100 +
-    (B < 255 ? B < 1 ? 0 : B : 255)
-  ).toString(16).slice(1);
+  const G = ((num >> 8) & 0x00ff) + amt;
+  const B = (num & 0x0000ff) + amt;
+  return (
+    "#" +
+    (
+      0x1000000 +
+      (R < 255 ? (R < 1 ? 0 : R) : 255) * 0x10000 +
+      (G < 255 ? (G < 1 ? 0 : G) : 255) * 0x100 +
+      (B < 255 ? (B < 1 ? 0 : B) : 255)
+    )
+      .toString(16)
+      .slice(1)
+  );
 }
 
 function renderLog() {
   logEl.innerHTML = "";
-  state.log.forEach((entry) => {
+  state.log.forEach(entry => {
     const p = document.createElement("p");
     p.textContent = entry;
     logEl.appendChild(p);
@@ -4155,26 +4352,26 @@ const editor = {
       const el = document.getElementById("importFileInput");
       if (el) el.click();
     });
-    addListener("importFileInput", "change", (e) => this.importJSON(e));
+    addListener("importFileInput", "change", e => this.importJSON(e));
     addListener("importPreviewCloseBtn", "click", () => this.hideImportPreview());
     addListener("importPreviewCancelBtn", "click", () => this.hideImportPreview());
     addListener("importPreviewConfirmBtn", "click", () => this.applyImportedData());
     addListener("previewCopyBtn", "click", () => this.copyFromPreview());
 
-    document.getElementById("editorLevelName").addEventListener("input", (e) => {
+    document.getElementById("editorLevelName").addEventListener("input", e => {
       if (this.state) this.state.name = e.target.value;
     });
-    document.getElementById("editorDescription").addEventListener("input", (e) => {
+    document.getElementById("editorDescription").addEventListener("input", e => {
       if (this.state) this.state.description = e.target.value;
     });
-    document.getElementById("editorTimeLimit").addEventListener("change", (e) => {
+    document.getElementById("editorTimeLimit").addEventListener("change", e => {
       if (this.state) this.state.timeLimit = Number(e.target.value);
     });
-    document.getElementById("editorGridSize").addEventListener("change", (e) => {
+    document.getElementById("editorGridSize").addEventListener("change", e => {
       if (this.state) {
         const newSize = Number(e.target.value);
         this.state.gridSize = newSize;
-        Object.keys(this.state.buried).forEach((key) => {
+        Object.keys(this.state.buried).forEach(key => {
           if (Number(key) >= newSize) {
             delete this.state.buried[key];
           }
@@ -4182,16 +4379,16 @@ const editor = {
         this.renderGrid();
       }
     });
-    document.getElementById("editorPieceName").addEventListener("input", (e) => {
+    document.getElementById("editorPieceName").addEventListener("input", e => {
       if (this.state) this.state.pieceName = e.target.value;
     });
-    document.getElementById("editorSnapRadius").addEventListener("change", (e) => {
+    document.getElementById("editorSnapRadius").addEventListener("change", e => {
       if (this.state) this.state.snapRadius = Number(e.target.value);
     });
 
-    document.querySelectorAll(".style-preset-btn").forEach((btn) => {
+    document.querySelectorAll(".style-preset-btn").forEach(btn => {
       btn.addEventListener("click", () => {
-        document.querySelectorAll(".style-preset-btn").forEach((b) => b.classList.remove("active"));
+        document.querySelectorAll(".style-preset-btn").forEach(b => b.classList.remove("active"));
         btn.classList.add("active");
         if (this.state) {
           this.state.stylePreset = btn.dataset.style;
@@ -4200,7 +4397,7 @@ const editor = {
       });
     });
 
-    document.getElementById("editorTarget").addEventListener("click", (e) => {
+    document.getElementById("editorTarget").addEventListener("click", e => {
       if (e.target.id === "editorTarget" || e.target.id === "editorTargetInner") {
         if (!this.selectedPieceId) {
           this.showHint("请先在左侧选择一个碎片");
@@ -4213,15 +4410,15 @@ const editor = {
       }
     });
 
-    document.addEventListener("pointermove", (e) => this.handleSlotDragMove(e));
-    document.addEventListener("pointerup", (e) => this.handleSlotDragEnd(e));
+    document.addEventListener("pointermove", e => this.handleSlotDragMove(e));
+    document.addEventListener("pointerup", e => this.handleSlotDragEnd(e));
 
     addListener("addLayerBtn", "click", () => this.createNewLayer());
     addListener("removeLayerBtn", "click", () => this.removeCurrentLayer());
 
     const layerNameEl = document.getElementById("editorLayerName");
     if (layerNameEl) {
-      layerNameEl.addEventListener("input", (e) => {
+      layerNameEl.addEventListener("input", e => {
         const layer = this.getCurrentLayer();
         if (layer) {
           layer.name = e.target.value;
@@ -4231,19 +4428,19 @@ const editor = {
     }
     const layerDescEl = document.getElementById("editorLayerDesc");
     if (layerDescEl) {
-      layerDescEl.addEventListener("input", (e) => {
+      layerDescEl.addEventListener("input", e => {
         const layer = this.getCurrentLayer();
         if (layer) layer.description = e.target.value;
       });
     }
     const layerGridSizeEl = document.getElementById("editorLayerGridSize");
     if (layerGridSizeEl) {
-      layerGridSizeEl.addEventListener("change", (e) => {
+      layerGridSizeEl.addEventListener("change", e => {
         const layer = this.getCurrentLayer();
         if (layer) {
           const newSize = Number(e.target.value);
           layer.gridSize = newSize;
-          Object.keys(layer.buried || {}).forEach((key) => {
+          Object.keys(layer.buried || {}).forEach(key => {
             if (Number(key) >= newSize) {
               delete layer.buried[key];
             }
@@ -4255,7 +4452,7 @@ const editor = {
     }
     const layerColorEl = document.getElementById("editorLayerColor");
     if (layerColorEl) {
-      layerColorEl.addEventListener("input", (e) => {
+      layerColorEl.addEventListener("input", e => {
         const layer = this.getCurrentLayer();
         if (layer) {
           layer.color = e.target.value;
@@ -4265,14 +4462,14 @@ const editor = {
     }
     const pieceLayerSelect = document.getElementById("editorPieceLayer");
     if (pieceLayerSelect) {
-      pieceLayerSelect.addEventListener("change", (e) => {
+      pieceLayerSelect.addEventListener("change", e => {
         if (!this.selectedPieceId || !this.state.layers) return;
         const targetLayerId = e.target.value;
         const targetLayer = this.state.layers.find(l => l.id === targetLayerId);
         if (!targetLayer) return;
         for (let i = 0; i < this.state.layers.length; i++) {
           const l = this.state.layers[i];
-          Object.keys(l.buried || {}).forEach((k) => {
+          Object.keys(l.buried || {}).forEach(k => {
             if (l.buried[k] === this.selectedPieceId) {
               delete l.buried[k];
             }
@@ -4334,12 +4531,13 @@ const editor = {
     } else if (template.target && template.target.style) {
       stylePreset = this.inferStylePreset(template);
     }
-    const hasLayers = template.layers && Array.isArray(template.layers) && template.layers.length > 0;
+    const hasLayers =
+      template.layers && Array.isArray(template.layers) && template.layers.length > 0;
     let layers;
     if (hasLayers) {
       layers = template.layers.map((layer, idx) => ({
-        id: layer.id || ("layer" + (idx + 1)),
-        name: layer.name || ("第" + (idx + 1) + "层"),
+        id: layer.id || "layer" + (idx + 1),
+        name: layer.name || "第" + (idx + 1) + "层",
         description: layer.description || "",
         gridSize: layer.gridSize || template.gridSize || 25,
         color: layer.color || DEFAULT_LAYER_COLORS[idx % DEFAULT_LAYER_COLORS.length],
@@ -4347,15 +4545,17 @@ const editor = {
         buried: JSON.parse(JSON.stringify(layer.buried || {}))
       }));
     } else {
-      layers = [{
-        id: "layer1",
-        name: "文化层",
-        description: "",
-        gridSize: template.gridSize || 25,
-        color: DEFAULT_LAYER_COLORS[0],
-        eventWeights: {},
-        buried: JSON.parse(JSON.stringify(template.buried || {}))
-      }];
+      layers = [
+        {
+          id: "layer1",
+          name: "文化层",
+          description: "",
+          gridSize: template.gridSize || 25,
+          color: DEFAULT_LAYER_COLORS[0],
+          eventWeights: {},
+          buried: JSON.parse(JSON.stringify(template.buried || {}))
+        }
+      ];
     }
     return {
       isCustom: true,
@@ -4379,7 +4579,7 @@ const editor = {
   generateCopyName(originalName) {
     const baseName = originalName || "自定义关卡";
     const existingLevels = customLevelsStore.getAll();
-    const existingNames = existingLevels.map((l) => l.name);
+    const existingNames = existingLevels.map(l => l.name);
     let copyName = `${baseName} 副本`;
     let counter = 2;
     while (existingNames.includes(copyName)) {
@@ -4453,15 +4653,17 @@ const editor = {
       stylePreset: "bowl",
       difficulty: "自定义",
       buried: {},
-      layers: [{
-        id: "layer1",
-        name: "文化层",
-        description: "",
-        gridSize: 25,
-        color: DEFAULT_LAYER_COLORS[0],
-        eventWeights: {},
-        buried: {}
-      }],
+      layers: [
+        {
+          id: "layer1",
+          name: "文化层",
+          description: "",
+          gridSize: 25,
+          color: DEFAULT_LAYER_COLORS[0],
+          eventWeights: {},
+          buried: {}
+        }
+      ],
       currentEditorLayerIndex: 0,
       pieceDefs: [],
       goals: {}
@@ -4480,7 +4682,7 @@ const editor = {
 
   getCurrentLayerGridSize() {
     const layer = this.getCurrentLayer();
-    return layer ? (layer.gridSize || this.state.gridSize) : this.state.gridSize;
+    return layer ? layer.gridSize || this.state.gridSize : this.state.gridSize;
   },
 
   createNewLayer() {
@@ -4529,7 +4731,7 @@ const editor = {
     document.getElementById("editorGridSize").value = String(this.state.gridSize || 25);
     document.getElementById("editorPieceName").value = this.state.pieceName || "碎片";
     document.getElementById("editorSnapRadius").value = this.state.snapRadius || 60;
-    document.querySelectorAll(".style-preset-btn").forEach((btn) => {
+    document.querySelectorAll(".style-preset-btn").forEach(btn => {
       btn.classList.toggle("active", btn.dataset.style === (this.state.stylePreset || "bowl"));
     });
     const currentLayer = this.getCurrentLayer();
@@ -4540,7 +4742,8 @@ const editor = {
       const editorLayerColor = document.getElementById("editorLayerColor");
       if (editorLayerName) editorLayerName.value = currentLayer.name || "";
       if (editorLayerDesc) editorLayerDesc.value = currentLayer.description || "";
-      if (editorLayerGridSize) editorLayerGridSize.value = String(currentLayer.gridSize || this.state.gridSize || 25);
+      if (editorLayerGridSize)
+        editorLayerGridSize.value = String(currentLayer.gridSize || this.state.gridSize || 25);
       if (editorLayerColor) editorLayerColor.value = currentLayer.color || DEFAULT_LAYER_COLORS[0];
     }
     this.renderEditorLayerTabs();
@@ -4555,11 +4758,12 @@ const editor = {
     this.state.layers.forEach((layer, idx) => {
       const tab = document.createElement("button");
       tab.type = "button";
-      tab.className = "editor-layer-tab" + (idx === this.state.currentEditorLayerIndex ? " active" : "");
+      tab.className =
+        "editor-layer-tab" + (idx === this.state.currentEditorLayerIndex ? " active" : "");
       const buriedCount = Object.keys(layer.buried || {}).length;
       tab.innerHTML = `
         <span class="editor-layer-tab-color" style="background:${layer.color || DEFAULT_LAYER_COLORS[idx % DEFAULT_LAYER_COLORS.length]}"></span>
-        <span class="editor-layer-tab-name">${layer.name || ("第" + (idx + 1) + "层")}</span>
+        <span class="editor-layer-tab-name">${layer.name || "第" + (idx + 1) + "层"}</span>
         <span class="editor-layer-tab-count">${buriedCount}片</span>
       `;
       tab.addEventListener("click", () => this.switchEditorLayer(idx));
@@ -4581,9 +4785,11 @@ const editor = {
       { id: "find_coin", name: "古币", desc: "意外发现古钱币，加分事件" },
       { id: "ancient_guide", name: "古迹指引", desc: "发现古人留下的标记" }
     ];
-    container.innerHTML = eventDefs.map(def => {
-      const weight = currentLayer.eventWeights[def.id] !== undefined ? currentLayer.eventWeights[def.id] : 1.0;
-      return `
+    container.innerHTML = eventDefs
+      .map(def => {
+        const weight =
+          currentLayer.eventWeights[def.id] !== undefined ? currentLayer.eventWeights[def.id] : 1.0;
+        return `
         <div class="event-weight-item">
           <div class="event-weight-info">
             <span class="event-weight-name">${def.name}</span>
@@ -4595,9 +4801,10 @@ const editor = {
           </div>
         </div>
       `;
-    }).join("");
+      })
+      .join("");
     container.querySelectorAll(".event-weight-slider").forEach(slider => {
-      slider.addEventListener("input", (e) => {
+      slider.addEventListener("input", e => {
         const eventId = e.target.dataset.event;
         const val = parseFloat(e.target.value);
         currentLayer.eventWeights[eventId] = val;
@@ -4622,9 +4829,12 @@ const editor = {
         }
       }
     }
-    select.innerHTML = this.state.layers.map((layer, idx) =>
-      `<option value="${layer.id}" ${layer.id === foundLayer ? "selected" : ""}>第${idx + 1}层 · ${layer.name}</option>`
-    ).join("");
+    select.innerHTML = this.state.layers
+      .map(
+        (layer, idx) =>
+          `<option value="${layer.id}" ${layer.id === foundLayer ? "selected" : ""}>第${idx + 1}层 · ${layer.name}</option>`
+      )
+      .join("");
   },
 
   renderAll() {
@@ -4673,7 +4883,13 @@ const editor = {
           <div class="editor-goal-info">
             <span class="editor-goal-name">${goalDef.name}</span>
             <span class="editor-goal-desc">${goalDef.description(
-              needsValue ? (enabled && goalValue ? goalValue : (goalId === "maxDigs" ? "N" : "N")) : true
+              needsValue
+                ? enabled && goalValue
+                  ? goalValue
+                  : goalId === "maxDigs"
+                    ? "N"
+                    : "N"
+                : true
             )}</span>
           </div>
           ${valueInput}
@@ -4681,7 +4897,7 @@ const editor = {
       `;
 
       const checkbox = wrapper.querySelector('input[type="checkbox"]');
-      checkbox.addEventListener("change", (e) => {
+      checkbox.addEventListener("change", e => {
         if (e.target.checked) {
           if (needsValue) {
             const valInput = wrapper.querySelector(".editor-goal-value");
@@ -4689,9 +4905,10 @@ const editor = {
             if (val > 0) {
               this.state.goals[goalId] = val;
             } else {
-              this.state.goals[goalId] = goalId === "maxDigs" 
-                ? Math.ceil((this.state.gridSize || 25) * 0.6) 
-                : Math.floor((this.state.timeLimit || 120) * 0.8);
+              this.state.goals[goalId] =
+                goalId === "maxDigs"
+                  ? Math.ceil((this.state.gridSize || 25) * 0.6)
+                  : Math.floor((this.state.timeLimit || 120) * 0.8);
               valInput.value = this.state.goals[goalId];
             }
           } else {
@@ -4705,7 +4922,7 @@ const editor = {
 
       if (needsValue) {
         const valInput = wrapper.querySelector(".editor-goal-value");
-        valInput.addEventListener("change", (e) => {
+        valInput.addEventListener("change", e => {
           const val = Number(e.target.value);
           if (val > 0 && this.state.goals[goalId] !== undefined) {
             this.state.goals[goalId] = val;
@@ -4713,7 +4930,7 @@ const editor = {
             if (descEl) descEl.textContent = goalDef.description(val);
           }
         });
-        valInput.addEventListener("input", (e) => {
+        valInput.addEventListener("input", e => {
           const val = Number(e.target.value);
           const descEl = wrapper.querySelector(".editor-goal-desc");
           if (descEl && val > 0) descEl.textContent = goalDef.description(val);
@@ -4769,15 +4986,17 @@ const editor = {
     this.state.pieceDefs = [];
     this.state.buried = {};
     if (this.state.layers) {
-      this.state.layers.forEach(l => { l.buried = {}; });
+      this.state.layers.forEach(l => {
+        l.buried = {};
+      });
     }
     this.selectedPieceId = null;
     this.renderAll();
   },
 
   deletePiece(pieceId) {
-    this.state.pieceDefs = this.state.pieceDefs.filter((p) => p.id !== pieceId);
-    Object.keys(this.state.buried).forEach((key) => {
+    this.state.pieceDefs = this.state.pieceDefs.filter(p => p.id !== pieceId);
+    Object.keys(this.state.buried).forEach(key => {
       if (this.state.buried[key] === pieceId) {
         delete this.state.buried[key];
       }
@@ -4803,12 +5022,12 @@ const editor = {
   },
 
   setPieceLabel(pieceId, label) {
-    const piece = this.state.pieceDefs.find((p) => p.id === pieceId);
+    const piece = this.state.pieceDefs.find(p => p.id === pieceId);
     if (piece) piece.label = label;
   },
 
   setPieceAngle(pieceId, angle, field) {
-    const piece = this.state.pieceDefs.find((p) => p.id === pieceId);
+    const piece = this.state.pieceDefs.find(p => p.id === pieceId);
     if (piece) {
       piece[field] = Number(angle);
       if (field === "angle") this.renderSlots();
@@ -4816,7 +5035,7 @@ const editor = {
   },
 
   setPieceSlot(pieceId, x, y) {
-    const piece = this.state.pieceDefs.find((p) => p.id === pieceId);
+    const piece = this.state.pieceDefs.find(p => p.id === pieceId);
     if (piece) {
       x = Math.max(8, Math.min(92, x));
       y = Math.max(8, Math.min(92, y));
@@ -4847,46 +5066,51 @@ const editor = {
           <div class="mini-field">
             <label>正确角度 (°)</label>
             <select class="angle-select" data-field="angle">
-              ${[0, 45, 90, 135, 180, 225, 270, 315].map((a) => 
-                `<option value="${a}" ${piece.angle === a ? "selected" : ""}>${a}°</option>`
-              ).join("")}
+              ${[0, 45, 90, 135, 180, 225, 270, 315]
+                .map(
+                  a => `<option value="${a}" ${piece.angle === a ? "selected" : ""}>${a}°</option>`
+                )
+                .join("")}
             </select>
           </div>
           <div class="mini-field">
             <label>初始角度 (°)</label>
             <select class="angle-select" data-field="initialAngle">
-              ${[0, 45, 90, 135, 180, 225, 270, 315].map((a) => 
-                `<option value="${a}" ${piece.initialAngle === a ? "selected" : ""}>${a}°</option>`
-              ).join("")}
+              ${[0, 45, 90, 135, 180, 225, 270, 315]
+                .map(
+                  a =>
+                    `<option value="${a}" ${piece.initialAngle === a ? "selected" : ""}>${a}°</option>`
+                )
+                .join("")}
             </select>
           </div>
         </div>
       `;
 
       const titleDiv = card.querySelector(".piece-editor-title");
-      titleDiv.addEventListener("click", (e) => {
+      titleDiv.addEventListener("click", e => {
         if (!e.target.classList.contains("piece-editor-label")) {
           this.selectPiece(piece.id);
         }
       });
 
       const labelInput = card.querySelector(".piece-editor-label");
-      labelInput.addEventListener("input", (e) => {
+      labelInput.addEventListener("input", e => {
         this.setPieceLabel(piece.id, e.target.value);
       });
-      labelInput.addEventListener("click", (e) => e.stopPropagation());
+      labelInput.addEventListener("click", e => e.stopPropagation());
 
-      card.querySelector(".piece-delete-btn").addEventListener("click", (e) => {
+      card.querySelector(".piece-delete-btn").addEventListener("click", e => {
         e.stopPropagation();
         this.deletePiece(piece.id);
       });
 
-      card.querySelectorAll(".angle-select").forEach((sel) => {
-        sel.addEventListener("change", (e) => {
+      card.querySelectorAll(".angle-select").forEach(sel => {
+        sel.addEventListener("change", e => {
           e.stopPropagation();
           this.setPieceAngle(piece.id, e.target.value, sel.dataset.field);
         });
-        sel.addEventListener("click", (e) => e.stopPropagation());
+        sel.addEventListener("click", e => e.stopPropagation());
       });
 
       container.appendChild(card);
@@ -4938,8 +5162,8 @@ const editor = {
       const pieceId = buried[String(i)];
       if (pieceId) {
         cell.classList.add("has-piece");
-        const piece = this.state.pieceDefs.find((p) => p.id === pieceId);
-        const idx = this.state.pieceDefs.findIndex((p) => p.id === pieceId);
+        const piece = this.state.pieceDefs.find(p => p.id === pieceId);
+        const idx = this.state.pieceDefs.findIndex(p => p.id === pieceId);
         cell.textContent = String(idx + 1);
         cell.title = `${piece ? piece.label : pieceId}`;
         if (pieceId === this.selectedPieceId) {
@@ -4955,7 +5179,9 @@ const editor = {
   handleGridCellClick(cellIdx) {
     const key = String(cellIdx);
     const currentLayer = this.getCurrentLayer();
-    const buried = currentLayer ? (currentLayer.buried || (currentLayer.buried = {})) : this.state.buried;
+    const buried = currentLayer
+      ? currentLayer.buried || (currentLayer.buried = {})
+      : this.state.buried;
 
     if (buried[key]) {
       const existingPieceId = buried[key];
@@ -4973,7 +5199,7 @@ const editor = {
           });
         });
       }
-      Object.keys(this.state.buried).forEach((k) => {
+      Object.keys(this.state.buried).forEach(k => {
         if (this.state.buried[k] === this.selectedPieceId) {
           delete this.state.buried[k];
         }
@@ -4993,11 +5219,11 @@ const editor = {
 
   renderSlots() {
     const target = document.getElementById("editorTarget");
-    target.querySelectorAll(".editor-slot").forEach((el) => el.remove());
+    target.querySelectorAll(".editor-slot").forEach(el => el.remove());
 
-    this.state.pieceDefs.forEach((piece) => {
+    this.state.pieceDefs.forEach(piece => {
       if (!piece.slot || piece.slot.x === undefined) return;
-      const idx = this.state.pieceDefs.findIndex((p) => p.id === piece.id);
+      const idx = this.state.pieceDefs.findIndex(p => p.id === piece.id);
       const slot = document.createElement("div");
       slot.className = "editor-slot";
       if (piece.id === this.selectedPieceId) {
@@ -5013,17 +5239,17 @@ const editor = {
       `;
       slot.title = `${piece.label} - 双击旋转，拖动调整位置`;
 
-      slot.addEventListener("pointerdown", (e) => {
+      slot.addEventListener("pointerdown", e => {
         e.stopPropagation();
         this.startSlotDrag(e, piece.id);
       });
 
-      slot.addEventListener("dblclick", (e) => {
+      slot.addEventListener("dblclick", e => {
         e.stopPropagation();
         this.rotateSlot(piece.id);
       });
 
-      slot.addEventListener("click", (e) => {
+      slot.addEventListener("click", e => {
         e.stopPropagation();
         this.selectPiece(piece.id);
       });
@@ -5033,7 +5259,7 @@ const editor = {
   },
 
   rotateSlot(pieceId) {
-    const piece = this.state.pieceDefs.find((p) => p.id === pieceId);
+    const piece = this.state.pieceDefs.find(p => p.id === pieceId);
     if (piece) {
       piece.angle = (piece.angle + 45) % 360;
       this.selectedPieceId = pieceId;
@@ -5093,18 +5319,18 @@ const editor = {
       let html = "<strong>✅ 配置校验通过！</strong> 关卡已可以正常游玩。";
       if (result.warnings.length > 0) {
         html += `<br><br>💡 优化建议：<ul>`;
-        result.warnings.forEach((w) => html += `<li>${w}</li>`);
+        result.warnings.forEach(w => (html += `<li>${w}</li>`));
         html += "</ul>";
       }
       container.innerHTML = html;
     } else {
       container.className = "validation-result error";
       let html = "<strong>❌ 存在以下问题需要修复：</strong><ul>";
-      result.errors.forEach((e) => html += `<li>${e}</li>`);
+      result.errors.forEach(e => (html += `<li>${e}</li>`));
       html += "</ul>";
       if (result.warnings.length > 0) {
         html += `<br>💡 优化建议：<ul>`;
-        result.warnings.forEach((w) => html += `<li>${w}</li>`);
+        result.warnings.forEach(w => (html += `<li>${w}</li>`));
         html += "</ul>";
       }
       container.innerHTML = html;
@@ -5127,7 +5353,7 @@ const editor = {
 
     const hasLayers = state.layers && Array.isArray(state.layers) && state.layers.length > 0;
     const result = {
-      id: state.id || ("custom_" + Date.now()),
+      id: state.id || "custom_" + Date.now(),
       isCustom: true,
       name: state.name || "自定义关卡",
       pieceName: state.pieceName || "碎片",
@@ -5237,7 +5463,7 @@ const editor = {
     const file = e.target.files && e.target.files[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = (ev) => {
+    reader.onload = ev => {
       try {
         const data = JSON.parse(ev.target.result);
         if (!data.pieceDefs || !data.buried) {
@@ -5272,20 +5498,45 @@ const editor = {
 
     if (data.target && data.target.style) {
       const bg = data.target.style.background;
-      const matchedPreset = Object.entries(STYLE_PRESETS).find(([, v]) => v.target.background === bg);
+      const matchedPreset = Object.entries(STYLE_PRESETS).find(
+        ([, v]) => v.target.background === bg
+      );
       if (!matchedPreset) {
-        warnings.push(`导入文件使用了自定义器物样式（背景色 ${bg}），将映射为最接近的「${styleLabelMap[stylePreset] || stylePreset}」样式`);
+        warnings.push(
+          `导入文件使用了自定义器物样式（背景色 ${bg}），将映射为最接近的「${styleLabelMap[stylePreset] || stylePreset}」样式`
+        );
       }
     }
 
     const missingFields = [];
-    if (!data.name) { missingFields.push("name"); data.name = ""; }
-    if (!data.description) { missingFields.push("description"); data.description = ""; }
-    if (!data.timeLimit) { missingFields.push("timeLimit"); data.timeLimit = 120; }
-    if (!data.pieceName) { missingFields.push("pieceName"); data.pieceName = "碎片"; }
-    if (!data.snapRadius) { missingFields.push("snapRadius"); data.snapRadius = 60; }
-    if (!data.goals) { missingFields.push("goals"); data.goals = {}; }
-    if (!data.difficulty) { missingFields.push("difficulty"); data.difficulty = "自定义"; }
+    if (!data.name) {
+      missingFields.push("name");
+      data.name = "";
+    }
+    if (!data.description) {
+      missingFields.push("description");
+      data.description = "";
+    }
+    if (!data.timeLimit) {
+      missingFields.push("timeLimit");
+      data.timeLimit = 120;
+    }
+    if (!data.pieceName) {
+      missingFields.push("pieceName");
+      data.pieceName = "碎片";
+    }
+    if (!data.snapRadius) {
+      missingFields.push("snapRadius");
+      data.snapRadius = 60;
+    }
+    if (!data.goals) {
+      missingFields.push("goals");
+      data.goals = {};
+    }
+    if (!data.difficulty) {
+      missingFields.push("difficulty");
+      data.difficulty = "自定义";
+    }
     if (missingFields.length > 0) {
       warnings.push(`以下字段缺失已自动补充默认值：${missingFields.join("、")}`);
     }
@@ -5306,13 +5557,19 @@ const editor = {
         }
         if (piece.slot) {
           if (piece.slot.x < 0 || piece.slot.x > 100 || piece.slot.y < 0 || piece.slot.y > 100) {
-            issues.push(`碎片「${piece.label}」槽位坐标 (${piece.slot.x}, ${piece.slot.y}) 越界（允许 0~100），将自动钳制`);
+            issues.push(
+              `碎片「${piece.label}」槽位坐标 (${piece.slot.x}, ${piece.slot.y}) 越界（允许 0~100），将自动钳制`
+            );
             piece.slot.x = Math.max(0, Math.min(100, piece.slot.x));
             piece.slot.y = Math.max(0, Math.min(100, piece.slot.y));
           }
         }
-        if (piece.angle === undefined) { piece.angle = 0; }
-        if (piece.initialAngle === undefined) { piece.initialAngle = 0; }
+        if (piece.angle === undefined) {
+          piece.angle = 0;
+        }
+        if (piece.initialAngle === undefined) {
+          piece.initialAngle = 0;
+        }
       });
     }
 
@@ -5320,7 +5577,7 @@ const editor = {
     let layers = null;
 
     const cleanBuried = (buriedObj, layerSize, layerName = "") => {
-      const validPieceIds = new Set(data.pieceDefs ? data.pieceDefs.map((p) => p.id) : []);
+      const validPieceIds = new Set(data.pieceDefs ? data.pieceDefs.map(p => p.id) : []);
       const validBurials = [];
       const burialCounts = {};
       const pieceBurialCounts = {};
@@ -5328,7 +5585,9 @@ const editor = {
       Object.entries(buriedObj || {}).forEach(([cell, pid]) => {
         const cellNum = Number(cell);
         if (isNaN(cellNum) || cellNum < 0 || cellNum >= layerSize) {
-          issues.push(`${layerName}埋藏位置 ${cell} 超出探方范围（0~${layerSize - 1}），该埋藏将被移除`);
+          issues.push(
+            `${layerName}埋藏位置 ${cell} 超出探方范围（0~${layerSize - 1}），该埋藏将被移除`
+          );
           return;
         }
         if (!validPieceIds.has(pid)) {
@@ -5344,19 +5603,23 @@ const editor = {
 
       Object.entries(burialCounts).forEach(([cell, pids]) => {
         if (pids.length > 1) {
-          const labels = pids.map((pid) => {
-            const piece = data.pieceDefs.find((p) => p.id === pid);
+          const labels = pids.map(pid => {
+            const piece = data.pieceDefs.find(p => p.id === pid);
             return piece ? piece.label : pid;
           });
-          issues.push(`${layerName}探方格 ${cell} 存在 ${pids.length} 个碎片埋藏冲突（${labels.join("、")}），仅保留最后一个`);
+          issues.push(
+            `${layerName}探方格 ${cell} 存在 ${pids.length} 个碎片埋藏冲突（${labels.join("、")}），仅保留最后一个`
+          );
         }
       });
 
       Object.entries(pieceBurialCounts).forEach(([pid, cells]) => {
         if (cells.length > 1) {
-          const piece = data.pieceDefs.find((p) => p.id === pid);
+          const piece = data.pieceDefs.find(p => p.id === pid);
           const label = piece ? piece.label : pid;
-          issues.push(`${layerName}碎片「${label}」在 ${cells.length} 个探方格重复埋藏，仅保留位置 ${cells[cells.length - 1]}`);
+          issues.push(
+            `${layerName}碎片「${label}」在 ${cells.length} 个探方格重复埋藏，仅保留位置 ${cells[cells.length - 1]}`
+          );
         }
       });
 
@@ -5380,13 +5643,19 @@ const editor = {
       layers = data.layers.map((layer, idx) => {
         let lSize = layer.gridSize || gridSize;
         if (!validGridSizes.includes(lSize)) {
-          issues.push(`第 ${idx + 1} 层「${layer.name || "未命名层"}」的探方尺寸 ${lSize} 不合法，将修正为 25`);
+          issues.push(
+            `第 ${idx + 1} 层「${layer.name || "未命名层"}」的探方尺寸 ${lSize} 不合法，将修正为 25`
+          );
           lSize = 25;
         }
-        const cleanedBuried = cleanBuried(layer.buried, lSize, `第 ${idx + 1} 层「${layer.name || "未命名层"}」`);
+        const cleanedBuried = cleanBuried(
+          layer.buried,
+          lSize,
+          `第 ${idx + 1} 层「${layer.name || "未命名层"}」`
+        );
         return {
-          id: layer.id || ("layer" + (idx + 1)),
-          name: layer.name || ("第" + (idx + 1) + "层"),
+          id: layer.id || "layer" + (idx + 1),
+          name: layer.name || "第" + (idx + 1) + "层",
           description: layer.description || "",
           gridSize: lSize,
           color: layer.color || DEFAULT_LAYER_COLORS[idx % DEFAULT_LAYER_COLORS.length],
@@ -5403,19 +5672,23 @@ const editor = {
     const pieceHasBuriedMap = {};
     if (layers) {
       layers.forEach(l => {
-        Object.values(l.buried || {}).forEach(pid => { pieceHasBuriedMap[pid] = true; });
+        Object.values(l.buried || {}).forEach(pid => {
+          pieceHasBuriedMap[pid] = true;
+        });
       });
     } else {
-      Object.values(data.buried || {}).forEach(pid => { pieceHasBuriedMap[pid] = true; });
+      Object.values(data.buried || {}).forEach(pid => {
+        pieceHasBuriedMap[pid] = true;
+      });
     }
-    data.pieceDefs.forEach((piece) => {
+    data.pieceDefs.forEach(piece => {
       if (!pieceHasBuriedMap[piece.id]) {
         warnings.push(`碎片「${piece.label}」没有埋藏位置，需手动在探方编辑中设置`);
       }
     });
 
     if (data.goals) {
-      Object.keys(data.goals).forEach((goalId) => {
+      Object.keys(data.goals).forEach(goalId => {
         if (!RESTORATION_GOALS[goalId]) {
           warnings.push(`存在未知的修复目标类型「${goalId}」，该目标将被忽略`);
           delete data.goals[goalId];
@@ -5441,15 +5714,17 @@ const editor = {
       goals: data.goals || {}
     };
     if (!state.layers) {
-      state.layers = [{
-        id: "layer1",
-        name: "文化层",
-        description: "",
-        gridSize: gridSize,
-        color: DEFAULT_LAYER_COLORS[0],
-        eventWeights: {},
-        buried: JSON.parse(JSON.stringify(state.buried || {}))
-      }];
+      state.layers = [
+        {
+          id: "layer1",
+          name: "文化层",
+          description: "",
+          gridSize: gridSize,
+          color: DEFAULT_LAYER_COLORS[0],
+          eventWeights: {},
+          buried: JSON.parse(JSON.stringify(state.buried || {}))
+        }
+      ];
     }
 
     return { state, issues, warnings };
@@ -5461,9 +5736,11 @@ const editor = {
     const cols = Math.sqrt(gridSize);
 
     document.getElementById("importPreviewName").textContent = state.name || "（未命名）";
-    document.getElementById("importPreviewSize").textContent = `${cols} × ${cols}（${gridSize} 格）`;
+    document.getElementById("importPreviewSize").textContent =
+      `${cols} × ${cols}（${gridSize} 格）`;
     document.getElementById("importPreviewPieceCount").textContent = String(state.pieceDefs.length);
-    document.getElementById("importPreviewStyle").textContent = styleLabelMap[state.stylePreset] || state.stylePreset;
+    document.getElementById("importPreviewStyle").textContent =
+      styleLabelMap[state.stylePreset] || state.stylePreset;
     document.getElementById("importPreviewTimeLimit").textContent = `${state.timeLimit} 秒`;
     document.getElementById("importPreviewSnapRadius").textContent = String(state.snapRadius);
 
@@ -5471,7 +5748,7 @@ const editor = {
     if (issues.length > 0) {
       issuesEl.innerHTML = `<div class="import-preview-section import-preview-section-error">
         <div class="import-preview-section-title">⚠️ 发现问题（已自动修正）</div>
-        <ul>${issues.map((i) => `<li>${i}</li>`).join("")}</ul>
+        <ul>${issues.map(i => `<li>${i}</li>`).join("")}</ul>
       </div>`;
     } else {
       issuesEl.innerHTML = "";
@@ -5481,7 +5758,7 @@ const editor = {
     if (warnings.length > 0) {
       warningsEl.innerHTML = `<div class="import-preview-section import-preview-section-warn">
         <div class="import-preview-section-title">💡 提示与警告</div>
-        <ul>${warnings.map((w) => `<li>${w}</li>`).join("")}</ul>
+        <ul>${warnings.map(w => `<li>${w}</li>`).join("")}</ul>
       </div>`;
     } else {
       warningsEl.innerHTML = `<div class="import-preview-section import-preview-section-ok">
@@ -5550,7 +5827,7 @@ function renderCustomLevelCards() {
   list.innerHTML = "";
   const bestRecords = archive.getBest();
 
-  levels.forEach((level) => {
+  levels.forEach(level => {
     const wrapper = document.createElement("div");
     wrapper.className = "custom-level-card";
 
@@ -5561,7 +5838,7 @@ function renderCustomLevelCards() {
     const icon = document.createElement("div");
     icon.className = `level-icon ${level.iconClass || "custom-icon"}`;
 
-    const best = bestRecords.find((r) => r.levelId === level.id);
+    const best = bestRecords.find(r => r.levelId === level.id);
     if (best && best.rating) {
       const badge = document.createElement("div");
       badge.className = `level-rating level-rating-${best.rating}`;
@@ -5595,7 +5872,7 @@ function renderCustomLevelCards() {
     editBtn.type = "button";
     editBtn.title = "编辑";
     editBtn.textContent = "✏️";
-    editBtn.addEventListener("click", (e) => {
+    editBtn.addEventListener("click", e => {
       e.stopPropagation();
       editor.open(level.id);
     });
@@ -5604,7 +5881,7 @@ function renderCustomLevelCards() {
     delBtn.type = "button";
     delBtn.title = "删除";
     delBtn.textContent = "🗑";
-    delBtn.addEventListener("click", (e) => {
+    delBtn.addEventListener("click", e => {
       e.stopPropagation();
       if (confirm(`确定要删除关卡「${level.name}」吗？`)) {
         customLevelsStore.delete(level.id);
@@ -5655,7 +5932,12 @@ goBack = function () {
     return;
   }
 
-  if (currentTemplate && customLevelsStore.get(currentTemplate) && !artifactTemplates[currentTemplate]?.isDailyChallenge && !currentTemplate.startsWith("daily_")) {
+  if (
+    currentTemplate &&
+    customLevelsStore.get(currentTemplate) &&
+    !artifactTemplates[currentTemplate]?.isDailyChallenge &&
+    !currentTemplate.startsWith("daily_")
+  ) {
     delete artifactTemplates[currentTemplate];
   }
   _origGoBack();
@@ -5667,11 +5949,11 @@ function seededRandom(seed) {
   const seedStr = String(seed);
   for (let i = 0; i < seedStr.length; i++) {
     const char = seedStr.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
+    hash = (hash << 5) - hash + char;
     hash = hash & hash;
   }
   let state = Math.abs(hash) || 1;
-  return function() {
+  return function () {
     state = (state * 1664525 + 1013904223) >>> 0;
     return state / 4294967296;
   };
@@ -5910,7 +6192,11 @@ function startDailyChallenge(practice, templateId = null) {
   const dateStr = getDateString();
   let challenge;
 
-  if (templateId && artifactTemplates[templateId] && artifactTemplates[templateId].isDailyChallenge) {
+  if (
+    templateId &&
+    artifactTemplates[templateId] &&
+    artifactTemplates[templateId].isDailyChallenge
+  ) {
     challenge = artifactTemplates[templateId];
   } else {
     const expectedId = `daily_${dateStr}`;
@@ -5940,7 +6226,7 @@ function startDailyChallenge(practice, templateId = null) {
 }
 
 const _origFreshStateDaily = freshState;
-freshState = function() {
+freshState = function () {
   const template = artifactTemplates[currentTemplate];
   if (template && template.isDailyChallenge && !isPracticeMode && template.toolCounts) {
     const savedToolkit = selectedToolkit;
@@ -5954,14 +6240,14 @@ freshState = function() {
 };
 
 const _origTryTriggerEventDaily = tryTriggerEvent;
-tryTriggerEvent = function() {
+tryTriggerEvent = function () {
   const template = artifactTemplates[currentTemplate];
   if (!template || !template.isDailyChallenge || !template.eventModifiers) {
     return _origTryTriggerEventDaily();
   }
 
   const events = Object.values(SITE_EVENTS);
-  const availableEvents = events.filter((evt) => {
+  const availableEvents = events.filter(evt => {
     const cooldown = state.eventCooldowns[evt.id] || 0;
     return cooldown <= 0;
   });
@@ -5985,8 +6271,10 @@ tryTriggerEvent = function() {
         if (addedLocked.length) effect.addedLockedCells = addedLocked;
         if (addedHinted.length) effect.addedHintedCells = addedHinted;
         if (addedProbeHints.length) effect.addedProbeHints = addedProbeHints;
-        if (state.toolWear !== before.toolWear) effect.toolWearDelta = state.toolWear - before.toolWear;
-        if (state.bonusScore !== before.bonusScore) effect.bonusScoreDelta = state.bonusScore - before.bonusScore;
+        if (state.toolWear !== before.toolWear)
+          effect.toolWearDelta = state.toolWear - before.toolWear;
+        if (state.bonusScore !== before.bonusScore)
+          effect.bonusScoreDelta = state.bonusScore - before.bonusScore;
 
         state.triggeredEvents.push({
           id: evt.id,
@@ -6012,7 +6300,7 @@ tryTriggerEvent = function() {
 
         state.eventCooldowns[evt.id] = evt.cooldown;
 
-        Object.keys(state.eventCooldowns).forEach((id) => {
+        Object.keys(state.eventCooldowns).forEach(id => {
           if (id !== evt.id && state.eventCooldowns[id] > 0) {
             state.eventCooldowns[id] -= 1;
           }
@@ -6023,7 +6311,7 @@ tryTriggerEvent = function() {
     }
   }
 
-  Object.keys(state.eventCooldowns).forEach((id) => {
+  Object.keys(state.eventCooldowns).forEach(id => {
     if (state.eventCooldowns[id] > 0) {
       state.eventCooldowns[id] -= 1;
     }
@@ -6033,7 +6321,7 @@ tryTriggerEvent = function() {
 };
 
 const _origFinishDaily = finish;
-finish = function(success, message) {
+finish = function (success, message) {
   if (!state.running) return;
 
   const template = artifactTemplates[currentTemplate];
@@ -6053,7 +6341,8 @@ finish = function(success, message) {
         completed: true,
         levelId: template.id,
         levelName: template.name,
-        timeUsed: state.elapsedTime !== undefined ? state.elapsedTime : (template.timeLimit - state.timeLeft),
+        timeUsed:
+          state.elapsedTime !== undefined ? state.elapsedTime : template.timeLimit - state.timeLeft,
         digs: state.digs,
         completeness: completeness,
         finalScore: scores.totalScore,
@@ -6094,7 +6383,7 @@ finish = function(success, message) {
         </div>
         <div class="daily-target-progress">
           <div class="target-progress-bar">
-            <div class="target-progress-fill ${reachedTarget ? 'reached' : ''}" style="width:${targetPercent}%"></div>
+            <div class="target-progress-fill ${reachedTarget ? "reached" : ""}" style="width:${targetPercent}%"></div>
             <div class="target-progress-marker" style="left:100%"></div>
           </div>
           <div class="target-score-row">
@@ -6115,7 +6404,7 @@ finish = function(success, message) {
       targetHtml += `
           <div class="target-reached">
             <span class="target-reached-icon">🎉</span>
-            <span class="target-reached-text">目标达成！${scoreDiff > 0 ? `超出 ${scoreDiff} 分` : '刚好达成'}</span>
+            <span class="target-reached-text">目标达成！${scoreDiff > 0 ? `超出 ${scoreDiff} 分` : "刚好达成"}</span>
           </div>
       `;
     } else {
@@ -6191,7 +6480,7 @@ function renderDailyChallengeCard() {
       </div>
       <div class="daily-challenge-info">
         <div class="daily-level-icon level-icon ${challenge.iconClass}">
-          ${hasCompleted && record.rating ? `<div class="level-rating level-rating-${record.rating}">${record.rating}</div>` : ''}
+          ${hasCompleted && record.rating ? `<div class="level-rating level-rating-${record.rating}">${record.rating}</div>` : ""}
         </div>
         <div class="daily-challenge-details">
           <h4>${challenge.name}</h4>
@@ -6210,7 +6499,7 @@ function renderDailyChallengeCard() {
 
   const startBtn = document.getElementById("startDailyBtn");
   if (startBtn) {
-    startBtn.addEventListener("click", (e) => {
+    startBtn.addEventListener("click", e => {
       e.stopPropagation();
       showLevelPreview(challenge.id, true, hasCompleted);
     });
@@ -6225,7 +6514,7 @@ function renderDailyChallengeCard() {
 
   const calendarBtn = document.getElementById("viewCalendarBtn");
   if (calendarBtn) {
-    calendarBtn.addEventListener("click", (e) => {
+    calendarBtn.addEventListener("click", e => {
       e.stopPropagation();
       openCalendarModal();
     });
@@ -6287,7 +6576,7 @@ function openCalendarModal() {
       renderCalendar();
     });
 
-    modal.addEventListener("click", (e) => {
+    modal.addEventListener("click", e => {
       if (e.target === modal) closeCalendarModal();
     });
   }
@@ -6324,7 +6613,7 @@ function renderCalendar() {
 
   const todayStr = getDateString();
 
-  calendarData.forEach((day) => {
+  calendarData.forEach(day => {
     const cell = document.createElement("div");
     cell.className = "calendar-cell";
 
@@ -6349,7 +6638,7 @@ function renderCalendar() {
       }
 
       if (day.dateStr && day.completed) {
-        cell.title = `${day.dateStr} · 得分：${day.score || 0} · 评级：${day.rating || '-'}`;
+        cell.title = `${day.dateStr} · 得分：${day.score || 0} · 评级：${day.rating || "-"}`;
       }
     }
 
@@ -6358,17 +6647,21 @@ function renderCalendar() {
 }
 
 const _origInitDaily = init;
-init = function() {
+init = function () {
   _origInitDaily();
   renderDailyChallengeCard();
 };
 
 const _origGoBackDaily = goBack;
-goBack = function() {
+goBack = function () {
   clearInterval(timer);
   if (tutorial.active) tutorial.skip();
 
-  if (currentTemplate && artifactTemplates[currentTemplate] && artifactTemplates[currentTemplate].isDailyChallenge) {
+  if (
+    currentTemplate &&
+    artifactTemplates[currentTemplate] &&
+    artifactTemplates[currentTemplate].isDailyChallenge
+  ) {
     currentTemplate = null;
     isDailyChallengeMode = false;
     isPracticeMode = false;
@@ -6403,7 +6696,12 @@ goBack = function() {
     return;
   }
 
-  if (currentTemplate && customLevelsStore.get(currentTemplate) && !artifactTemplates[currentTemplate]?.isDailyChallenge && !currentTemplate.startsWith("daily_")) {
+  if (
+    currentTemplate &&
+    customLevelsStore.get(currentTemplate) &&
+    !artifactTemplates[currentTemplate]?.isDailyChallenge &&
+    !currentTemplate.startsWith("daily_")
+  ) {
     delete artifactTemplates[currentTemplate];
   }
   _origGoBackDaily();

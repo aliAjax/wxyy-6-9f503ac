@@ -17,8 +17,12 @@ const SEEDED_RANDOM = {
     this._seed = (this._seed * 1664525 + 1013904223) >>> 0;
     return this._seed / 0x100000000;
   },
-  range(min, max) { return min + this.next() * (max - min); },
-  int(min, max) { return Math.floor(this.range(min, max + 1)); },
+  range(min, max) {
+    return min + this.next() * (max - min);
+  },
+  int(min, max) {
+    return Math.floor(this.range(min, max + 1));
+  },
   getState() {
     return this._seed;
   },
@@ -65,7 +69,7 @@ const SITE_EVENTS = {
         }
       }
       const remainingPieces = pieceIndices.filter(
-        (pi) => !state.dug.has(pi) && !state.found.has(template.buried[pi])
+        pi => !state.dug.has(pi) && !state.found.has(template.buried[pi])
       ).length;
       let lockCount = Math.min(2, lockable.length);
       if (lockable.length > 0 && remainingPieces > 2) {
@@ -75,7 +79,7 @@ const SITE_EVENTS = {
           const idx = SEEDED_RANDOM.int(0, lockable.length - 1);
           actualLock.push(lockable.splice(idx, 1)[0]);
         }
-        actualLock.forEach((i) => state.lockedCells.add(i));
+        actualLock.forEach(i => state.lockedCells.add(i));
         return {
           success: true,
           message: `塌方！${actualLock.length} 格探方被土方掩埋，暂时无法挖掘。`
@@ -115,13 +119,11 @@ const SITE_EVENTS = {
     key: true,
     apply(state, template) {
       const pieceIndices = Object.keys(template.buried).map(Number);
-      const hiddenPieces = pieceIndices.filter(
-        (i) => !state.dug.has(i) && !state.hintedCells.has(i)
-      );
+      const hiddenPieces = pieceIndices.filter(i => !state.dug.has(i) && !state.hintedCells.has(i));
       if (hiddenPieces.length > 0) {
         const targetIdx = hiddenPieces[SEEDED_RANDOM.int(0, hiddenPieces.length - 1)];
         state.hintedCells.add(targetIdx);
-        const def = template.pieceDefs.find((p) => p.id === template.buried[targetIdx]);
+        const def = template.pieceDefs.find(p => p.id === template.buried[targetIdx]);
         return {
           success: true,
           message: `发现文化层标记！${def ? def.label : "某件"}${template.pieceName}附近有标识。`
@@ -223,8 +225,13 @@ const TOOLS = {
           const lBuried = LAYER_HELPERS.getLayerBuried(template, layer.id);
           const lDug = state.layerDug.get(layer.id) || new Set();
           const lProbe = state.layerProbeHints.get(layer.id) || new Set();
-          const lHidden = Object.keys(lBuried).map(Number).filter(i => !lDug.has(i) && !lProbe.has(i));
-          if (lHidden.length > 0) { hasHidden = true; break; }
+          const lHidden = Object.keys(lBuried)
+            .map(Number)
+            .filter(i => !lDug.has(i) && !lProbe.has(i));
+          if (lHidden.length > 0) {
+            hasHidden = true;
+            break;
+          }
         }
         if (!hasHidden) return { ok: false, reason: "没有可探测的碎片" };
         return { ok: true, _needSwitchLayer: true };
@@ -244,7 +251,9 @@ const TOOLS = {
           const lBuried = LAYER_HELPERS.getLayerBuried(template, layer.id);
           const lDug = state.layerDug.get(layer.id) || new Set();
           const lProbe = state.layerProbeHints.get(layer.id) || new Set();
-          const lHidden = Object.keys(lBuried).map(Number).filter(i => !lDug.has(i) && !lProbe.has(i));
+          const lHidden = Object.keys(lBuried)
+            .map(Number)
+            .filter(i => !lDug.has(i) && !lProbe.has(i));
           if (lHidden.length > 0) {
             currentLayerId = layer.id;
             buried = lBuried;
@@ -429,7 +438,7 @@ function calculateLevelStats(records) {
       bestRating = record.rating;
     }
 
-    const score = record.finalScore !== undefined ? record.finalScore : (record.completeness || 0);
+    const score = record.finalScore !== undefined ? record.finalScore : record.completeness || 0;
     if (bestScore === null || score > bestScore) {
       bestScore = score;
     }
@@ -468,8 +477,7 @@ function calculateLevelStats(records) {
     .sort((a, b) => b[1] - a[1]);
   const mostUsedTool = sortedTools.length > 0 ? sortedTools[0] : null;
 
-  const sortedEvents = Object.entries(eventCountMap)
-    .sort((a, b) => b[1] - a[1]);
+  const sortedEvents = Object.entries(eventCountMap).sort((a, b) => b[1] - a[1]);
   const mostCommonEvent = sortedEvents.length > 0 ? sortedEvents[0] : null;
 
   return {
@@ -574,12 +582,11 @@ function calculateLayerAccuracy(template, gameState) {
     const record = gameState.layerRecords[layer.id] || { correctDigs: 0, totalDigs: 0, pieces: [] };
     const foundInLayer = record.pieces.length;
     const correctInLayer = Math.min(foundInLayer, expectedPieces);
-    const accuracy = expectedPieces > 0
-      ? Math.round((correctInLayer / expectedPieces) * 100)
-      : 100;
-    const digEfficiency = record.totalDigs > 0
-      ? Math.round(Math.max(0, 100 - Math.max(0, record.totalDigs - expectedPieces) * 15))
-      : 100;
+    const accuracy = expectedPieces > 0 ? Math.round((correctInLayer / expectedPieces) * 100) : 100;
+    const digEfficiency =
+      record.totalDigs > 0
+        ? Math.round(Math.max(0, 100 - Math.max(0, record.totalDigs - expectedPieces) * 15))
+        : 100;
     const layerScore = Math.round((accuracy + digEfficiency) / 2);
     const weight = idx + 1;
 
@@ -601,12 +608,10 @@ function calculateLayerAccuracy(template, gameState) {
     });
   });
 
-  const overallLayerAccuracy = totalExpectedPieces > 0
-    ? Math.round((totalCorrectPieces / totalExpectedPieces) * 100)
-    : 100;
-  const weightedAvgLayerScore = totalWeight > 0
-    ? Math.round(weightedLayerScore / totalWeight)
-    : 100;
+  const overallLayerAccuracy =
+    totalExpectedPieces > 0 ? Math.round((totalCorrectPieces / totalExpectedPieces) * 100) : 100;
+  const weightedAvgLayerScore =
+    totalWeight > 0 ? Math.round(weightedLayerScore / totalWeight) : 100;
 
   return {
     layerResults,
@@ -624,9 +629,16 @@ function calculateExpertScore(template, gameState) {
   const angleScore = Math.round(Math.max(0, 100 - gameState.wrongAngleAttempts * 15));
   const negativeCount = gameState.triggeredEvents.filter(e => e.type === "negative").length;
   const positiveCount = gameState.triggeredEvents.filter(e => e.type === "positive").length;
-  const eventScore = Math.round(Math.max(0, Math.min(100, 60 - negativeCount * 12 + positiveCount * 8)));
-  const hintScore = gameState.hintsUsed === 0 ? 100 : Math.round(Math.max(0, 100 - gameState.hintsUsed * 30));
-  const toolPenalty = (gameState.toolsUsed.probe * 15) + (gameState.toolsUsed.brush * 10) + (gameState.toolsUsed.compass * 20) + ((gameState.toolsUsed.trowel || 0) * 12);
+  const eventScore = Math.round(
+    Math.max(0, Math.min(100, 60 - negativeCount * 12 + positiveCount * 8))
+  );
+  const hintScore =
+    gameState.hintsUsed === 0 ? 100 : Math.round(Math.max(0, 100 - gameState.hintsUsed * 30));
+  const toolPenalty =
+    gameState.toolsUsed.probe * 15 +
+    gameState.toolsUsed.brush * 10 +
+    gameState.toolsUsed.compass * 20 +
+    (gameState.toolsUsed.trowel || 0) * 12;
   const toolScore = Math.round(Math.max(0, 100 - toolPenalty));
 
   const layerAccuracy = calculateLayerAccuracy(template, gameState);
@@ -634,11 +646,25 @@ function calculateExpertScore(template, gameState) {
 
   let totalScore;
   if (layerAccuracy.isMultiLayer) {
-    totalScore = Math.round((timeScore + digScore + angleScore + eventScore + hintScore + toolScore + layerScore) / 7);
+    totalScore = Math.round(
+      (timeScore + digScore + angleScore + eventScore + hintScore + toolScore + layerScore) / 7
+    );
   } else {
-    totalScore = Math.round((timeScore + digScore + angleScore + eventScore + hintScore + toolScore) / 6);
+    totalScore = Math.round(
+      (timeScore + digScore + angleScore + eventScore + hintScore + toolScore) / 6
+    );
   }
-  return { timeScore, digScore, angleScore, eventScore, hintScore, toolScore, layerScore, layerAccuracy, totalScore };
+  return {
+    timeScore,
+    digScore,
+    angleScore,
+    eventScore,
+    hintScore,
+    toolScore,
+    layerScore,
+    layerAccuracy,
+    totalScore
+  };
 }
 
 const STYLE_PRESETS = {
@@ -761,8 +787,19 @@ const STYLE_PRESETS = {
 };
 
 const DEFAULT_LABELS = [
-  "顶部", "底部", "左侧", "右侧", "左上", "右上", "左下", "右下",
-  "中心", "顶部左", "顶部右", "底部左", "底部右"
+  "顶部",
+  "底部",
+  "左侧",
+  "右侧",
+  "左上",
+  "右上",
+  "左下",
+  "右下",
+  "中心",
+  "顶部左",
+  "顶部右",
+  "底部左",
+  "底部右"
 ];
 
 if (typeof module !== "undefined" && module.exports) {

@@ -1,11 +1,4 @@
-const DEFAULT_LAYER_COLORS = [
-  "#d4b896",
-  "#b89968",
-  "#9c7856",
-  "#80603f",
-  "#6b4e35",
-  "#5a402c"
-];
+const DEFAULT_LAYER_COLORS = ["#d4b896", "#b89968", "#9c7856", "#80603f", "#6b4e35", "#5a402c"];
 
 const LAYER_HELPERS = {
   ensureLayers(template) {
@@ -109,9 +102,9 @@ const RESTORATION_GOALS = {
     id: "maxDigs",
     name: "精准挖掘",
     icon: "⛏️",
-    description: (value) => `挖掘次数不超过 ${value} 次`,
-    shortDescription: (value) => `挖掘≤${value}次`,
-    checkValid: (value) => typeof value === "number" && value > 0,
+    description: value => `挖掘次数不超过 ${value} 次`,
+    shortDescription: value => `挖掘≤${value}次`,
+    checkValid: value => typeof value === "number" && value > 0,
     evaluate: (state, template, value) => state.digs <= value
   },
   noHints: {
@@ -121,7 +114,7 @@ const RESTORATION_GOALS = {
     description: () => "全程不使用提示功能",
     shortDescription: () => "不使用提示",
     checkValid: () => true,
-    evaluate: (state) => state.hintsUsed === 0
+    evaluate: state => state.hintsUsed === 0
   },
   noTools: {
     id: "noTools",
@@ -130,7 +123,7 @@ const RESTORATION_GOALS = {
     description: () => "不使用任何道具（探针、刷子、罗盘、小手铲）",
     shortDescription: () => "不使用道具",
     checkValid: () => true,
-    evaluate: (state) =>
+    evaluate: state =>
       state.toolsUsed.probe === 0 &&
       state.toolsUsed.brush === 0 &&
       state.toolsUsed.compass === 0 &&
@@ -140,10 +133,12 @@ const RESTORATION_GOALS = {
     id: "timeLimit",
     name: "限时修复",
     icon: "⏱️",
-    description: (value) => `在 ${value} 秒内完成修复`,
-    shortDescription: (value) => `用时≤${value}秒`,
-    checkValid: (value) => typeof value === "number" && value > 0,
-    evaluate: (state, template, value) => (state.elapsedTime !== undefined ? state.elapsedTime : (template.timeLimit - state.timeLeft)) <= value
+    description: value => `在 ${value} 秒内完成修复`,
+    shortDescription: value => `用时≤${value}秒`,
+    checkValid: value => typeof value === "number" && value > 0,
+    evaluate: (state, template, value) =>
+      (state.elapsedTime !== undefined ? state.elapsedTime : template.timeLimit - state.timeLeft) <=
+      value
   },
   avoidNegativeKeyEvents: {
     id: "avoidNegativeKeyEvents",
@@ -152,8 +147,8 @@ const RESTORATION_GOALS = {
     description: () => "不触发任何关键负面事件",
     shortDescription: () => "无关键负面事件",
     checkValid: () => true,
-    evaluate: (state) => {
-      return !state.keyEvents.some((e) => e.type === "negative");
+    evaluate: state => {
+      return !state.keyEvents.some(e => e.type === "negative");
     }
   },
   noAngleMistakes: {
@@ -163,7 +158,7 @@ const RESTORATION_GOALS = {
     description: () => "修复过程中无角度判断失误",
     shortDescription: () => "零角度失误",
     checkValid: () => true,
-    evaluate: (state) => state.wrongAngleAttempts === 0
+    evaluate: state => state.wrongAngleAttempts === 0
   }
 };
 
@@ -177,7 +172,8 @@ function getRating(score) {
 
 function getCommentary(rating, scores) {
   if (rating === "S") {
-    if (scores.hintScore === 100 && scores.angleScore === 100) return "完美发掘！零提示、零失误，考古界泰斗级的现场操作。";
+    if (scores.hintScore === 100 && scores.angleScore === 100)
+      return "完美发掘！零提示、零失误，考古界泰斗级的现场操作。";
     if (scores.hintScore === 100) return "教科书般的修复流程，全程独立判断，堪称楷模。";
     if (scores.timeScore >= 95) return "电光火石间完成修复，操作之快令人叹为观止！";
     return "极高水准的修复工作，专业素养令人赞叹。";
@@ -234,16 +230,18 @@ function evaluateGoals(template, state) {
 
 function getGoalsSummary(template) {
   const goals = template.goals || {};
-  return Object.keys(goals).map((goalId) => {
-    const goalDef = RESTORATION_GOALS[goalId];
-    if (!goalDef) return null;
-    return {
-      id: goalId,
-      name: goalDef.name,
-      icon: goalDef.icon,
-      shortDescription: goalDef.shortDescription(goals[goalId])
-    };
-  }).filter(Boolean);
+  return Object.keys(goals)
+    .map(goalId => {
+      const goalDef = RESTORATION_GOALS[goalId];
+      if (!goalDef) return null;
+      return {
+        id: goalId,
+        name: goalDef.name,
+        icon: goalDef.icon,
+        shortDescription: goalDef.shortDescription(goals[goalId])
+      };
+    })
+    .filter(Boolean);
 }
 
 function validateLevel(state) {
@@ -277,7 +275,9 @@ function validateLevel(state) {
       Object.keys(layer.buried || {}).forEach(k => {
         const n = Number(k);
         if (n < 0 || n >= size) {
-          errors.push(`第 ${lIdx + 1} 层「${layer.name}」的探方格 ${k} 超出该层探方尺寸范围 (${size})`);
+          errors.push(
+            `第 ${lIdx + 1} 层「${layer.name}」的探方格 ${k} 超出该层探方尺寸范围 (${size})`
+          );
         }
         if (cellSet.has(k)) {
           errors.push(`第 ${lIdx + 1} 层「${layer.name}」的探方格 ${k} 重复使用`);
@@ -287,7 +287,9 @@ function validateLevel(state) {
     });
     const totalLayerSize = Object.values(allLayerSizes).reduce((s, v) => s + v, 0);
     if (state.pieceDefs.length > totalLayerSize) {
-      errors.push(`碎片数量(${state.pieceDefs.length})不能超过所有地层探方总格数(${totalLayerSize})`);
+      errors.push(
+        `碎片数量(${state.pieceDefs.length})不能超过所有地层探方总格数(${totalLayerSize})`
+      );
     }
   } else {
     if (state.pieceDefs.length > state.gridSize) {
@@ -308,7 +310,9 @@ function validateLevel(state) {
     if (!buriedInfo) {
       errors.push(`「${piece.label}」还没有设置埋藏位置`);
     } else {
-      const cellKey = buriedInfo.layerId ? `${buriedInfo.layerId}:${buriedInfo.cell}` : buriedInfo.cell;
+      const cellKey = buriedInfo.layerId
+        ? `${buriedInfo.layerId}:${buriedInfo.cell}`
+        : buriedInfo.cell;
       if (usedCells.has(cellKey)) {
         errors.push(`多个碎片使用了同一个探方格 ${buriedInfo.cell}`);
       }
@@ -322,7 +326,7 @@ function validateLevel(state) {
 
   const checkOrphanBuried = (buriedObj, prefix = "") => {
     Object.entries(buriedObj).forEach(([cell, pid]) => {
-      if (!state.pieceDefs.find((p) => p.id === pid)) {
+      if (!state.pieceDefs.find(p => p.id === pid)) {
         warnings.push(`${prefix}探方格 ${cell} 埋藏的碎片 ${pid} 不存在于碎片列表`);
       }
     });
@@ -343,7 +347,7 @@ function validateLevel(state) {
   }
 
   const duplicates = {};
-  state.pieceDefs.forEach((p) => {
+  state.pieceDefs.forEach(p => {
     if (p.slot && p.slot.x !== undefined && p.slot.y !== undefined) {
       const key = `${Math.round(p.slot.x)}_${Math.round(p.slot.y)}`;
       duplicates[key] = (duplicates[key] || 0) + 1;
@@ -365,11 +369,24 @@ function validateLevel(state) {
       if (goalDef.checkValid && !goalDef.checkValid(goalValue)) {
         errors.push(`修复目标「${goalDef.name}」的参数无效：${goalValue}`);
       }
-      if (goalId === "timeLimit" && typeof goalValue === "number" && state.timeLimit && goalValue > state.timeLimit) {
-        errors.push(`修复目标「限时修复」的时间(${goalValue}秒)不能大于关卡总时长(${state.timeLimit}秒)`);
+      if (
+        goalId === "timeLimit" &&
+        typeof goalValue === "number" &&
+        state.timeLimit &&
+        goalValue > state.timeLimit
+      ) {
+        errors.push(
+          `修复目标「限时修复」的时间(${goalValue}秒)不能大于关卡总时长(${state.timeLimit}秒)`
+        );
       }
-      if (goalId === "maxDigs" && typeof goalValue === "number" && goalValue < state.pieceDefs.length) {
-        warnings.push(`修复目标「精准挖掘」的挖掘次数(${goalValue}次)少于碎片数量(${state.pieceDefs.length})，可能难以达成`);
+      if (
+        goalId === "maxDigs" &&
+        typeof goalValue === "number" &&
+        goalValue < state.pieceDefs.length
+      ) {
+        warnings.push(
+          `修复目标「精准挖掘」的挖掘次数(${goalValue}次)少于碎片数量(${state.pieceDefs.length})，可能难以达成`
+        );
       }
     });
   }

@@ -16,7 +16,10 @@ describe("LAYER_HELPERS - 文化层辅助函数", () => {
       const template = {
         gridSize: 25,
         buried: { 2: "p1", 7: "p2" },
-        pieceDefs: [{ id: "p1", label: "碎片1" }, { id: "p2", label: "碎片2" }]
+        pieceDefs: [
+          { id: "p1", label: "碎片1" },
+          { id: "p2", label: "碎片2" }
+        ]
       };
       const result = LAYER_HELPERS.ensureLayers(template);
       expect(result.layers).toHaveLength(1);
@@ -117,9 +120,7 @@ describe("LAYER_HELPERS - 文化层辅助函数", () => {
 
     it("找不到时应返回-1", () => {
       const template = {
-        layers: [
-          { id: "layer_0", name: "层1", gridSize: 25, buried: {} }
-        ]
+        layers: [{ id: "layer_0", name: "层1", gridSize: 25, buried: {} }]
       };
       expect(LAYER_HELPERS.getLayerIndex(template, "non_existent")).toBe(-1);
     });
@@ -128,9 +129,7 @@ describe("LAYER_HELPERS - 文化层辅助函数", () => {
   describe("getLayerBuried - 获取图层埋藏", () => {
     it("应返回图层的buried对象", () => {
       const template = {
-        layers: [
-          { id: "layer_0", name: "层1", gridSize: 25, buried: { 2: "p1", 5: "p2" } }
-        ]
+        layers: [{ id: "layer_0", name: "层1", gridSize: 25, buried: { 2: "p1", 5: "p2" } }]
       };
       const buried = LAYER_HELPERS.getLayerBuried(template, "layer_0");
       expect(buried).toEqual({ 2: "p1", 5: "p2" });
@@ -138,9 +137,7 @@ describe("LAYER_HELPERS - 文化层辅助函数", () => {
 
     it("buried不存在时应返回空对象", () => {
       const template = {
-        layers: [
-          { id: "layer_0", name: "层1", gridSize: 25 }
-        ]
+        layers: [{ id: "layer_0", name: "层1", gridSize: 25 }]
       };
       const buried = LAYER_HELPERS.getLayerBuried(template, "layer_0");
       expect(buried).toEqual({});
@@ -151,9 +148,7 @@ describe("LAYER_HELPERS - 文化层辅助函数", () => {
     it("应返回图层自身的gridSize", () => {
       const template = {
         gridSize: 25,
-        layers: [
-          { id: "layer_0", name: "层1", gridSize: 36, buried: {} }
-        ]
+        layers: [{ id: "layer_0", name: "层1", gridSize: 36, buried: {} }]
       };
       expect(LAYER_HELPERS.getLayerGridSize(template, "layer_0")).toBe(36);
     });
@@ -161,18 +156,14 @@ describe("LAYER_HELPERS - 文化层辅助函数", () => {
     it("图层没有gridSize时应返回模板的gridSize", () => {
       const template = {
         gridSize: 25,
-        layers: [
-          { id: "layer_0", name: "层1", buried: {} }
-        ]
+        layers: [{ id: "layer_0", name: "层1", buried: {} }]
       };
       expect(LAYER_HELPERS.getLayerGridSize(template, "layer_0")).toBe(25);
     });
 
     it("都没有时应返回默认值25", () => {
       const template = {
-        layers: [
-          { id: "layer_0", name: "层1", buried: {} }
-        ]
+        layers: [{ id: "layer_0", name: "层1", buried: {} }]
       };
       expect(LAYER_HELPERS.getLayerGridSize(template, "layer_0")).toBe(25);
     });
@@ -234,9 +225,7 @@ describe("LAYER_HELPERS - 文化层辅助函数", () => {
 
     it("空buried时应返回true", () => {
       const template = {
-        layers: [
-          { id: "layer_0", name: "层1", gridSize: 25, buried: {} }
-        ]
+        layers: [{ id: "layer_0", name: "层1", gridSize: 25, buried: {} }]
       };
       const dugSet = new Set();
       expect(LAYER_HELPERS.isLayerCleared(template, "layer_0", dugSet)).toBe(true);
@@ -255,47 +244,57 @@ describe("LAYER_HELPERS - 文化层辅助函数", () => {
     it("第一层始终可访问", () => {
       const layerDugMap = new Map();
       layerDugMap.set("layer_0", new Set());
-      expect(LAYER_HELPERS.isLayerAccessible(multiLayerTemplate, "layer_0", layerDugMap)).toBe(true);
+      expect(LAYER_HELPERS.isLayerAccessible(multiLayerTemplate, "layer_0", layerDugMap)).toBe(
+        true
+      );
     });
 
     it("上一层未清理完成时，下一层不可访问", () => {
       const layerDugMap = new Map();
       layerDugMap.set("layer_0", new Set([2]));
-      expect(LAYER_HELPERS.isLayerAccessible(multiLayerTemplate, "layer_1", layerDugMap)).toBe(false);
+      expect(LAYER_HELPERS.isLayerAccessible(multiLayerTemplate, "layer_1", layerDugMap)).toBe(
+        false
+      );
     });
 
     it("上一层清理完成时，下一层可访问", () => {
       const layerDugMap = new Map();
       layerDugMap.set("layer_0", new Set([2, 5]));
-      expect(LAYER_HELPERS.isLayerAccessible(multiLayerTemplate, "layer_1", layerDugMap)).toBe(true);
+      expect(LAYER_HELPERS.isLayerAccessible(multiLayerTemplate, "layer_1", layerDugMap)).toBe(
+        true
+      );
     });
 
     it("中间层未清理时，深层不可访问", () => {
       const layerDugMap = new Map();
       layerDugMap.set("layer_0", new Set([2, 5]));
       layerDugMap.set("layer_1", new Set([3]));
-      expect(LAYER_HELPERS.isLayerAccessible(multiLayerTemplate, "layer_2", layerDugMap)).toBe(false);
+      expect(LAYER_HELPERS.isLayerAccessible(multiLayerTemplate, "layer_2", layerDugMap)).toBe(
+        false
+      );
     });
 
     it("所有前置层清理完成时，深层可访问", () => {
       const layerDugMap = new Map();
       layerDugMap.set("layer_0", new Set([2, 5]));
       layerDugMap.set("layer_1", new Set([3, 7]));
-      expect(LAYER_HELPERS.isLayerAccessible(multiLayerTemplate, "layer_2", layerDugMap)).toBe(true);
+      expect(LAYER_HELPERS.isLayerAccessible(multiLayerTemplate, "layer_2", layerDugMap)).toBe(
+        true
+      );
     });
 
     it("上一层记录不存在时，应视为未清理", () => {
       const layerDugMap = new Map();
-      expect(LAYER_HELPERS.isLayerAccessible(multiLayerTemplate, "layer_1", layerDugMap)).toBe(false);
+      expect(LAYER_HELPERS.isLayerAccessible(multiLayerTemplate, "layer_1", layerDugMap)).toBe(
+        false
+      );
     });
   });
 
   describe("getEventProbability - 获取事件概率", () => {
     it("没有事件权重时应返回基础概率", () => {
       const template = {
-        layers: [
-          { id: "layer_0", name: "层1", gridSize: 25, buried: {} }
-        ]
+        layers: [{ id: "layer_0", name: "层1", gridSize: 25, buried: {} }]
       };
       const prob = LAYER_HELPERS.getEventProbability(template, "layer_0", "rain", 0.3);
       expect(prob).toBe(0.3);
@@ -360,9 +359,7 @@ describe("LAYER_HELPERS - 文化层辅助函数", () => {
 
     it("碎片所在图层可访问时应返回true", () => {
       const template = {
-        layers: [
-          { id: "layer_0", name: "层1", gridSize: 25, buried: { 2: "p1" } }
-        ]
+        layers: [{ id: "layer_0", name: "层1", gridSize: 25, buried: { 2: "p1" } }]
       };
       const pieceDef = { id: "p1", label: "碎片1", layerId: "layer_0" };
       const layerDugMap = new Map([["layer_0", new Set([2])]]);
@@ -831,12 +828,8 @@ describe("validateLevel - 自定义关卡校验", () => {
         timeLimit: 120,
         gridSize: 25,
         snapRadius: 60,
-        pieceDefs: [
-          { id: "p1", label: "碎片1", slot: { x: 20, y: 30 }, layerId: "layer_0" }
-        ],
-        layers: [
-          { id: "layer_0", name: "", gridSize: 25, buried: { 2: "p1" } }
-        ]
+        pieceDefs: [{ id: "p1", label: "碎片1", slot: { x: 20, y: 30 }, layerId: "layer_0" }],
+        layers: [{ id: "layer_0", name: "", gridSize: 25, buried: { 2: "p1" } }]
       };
       const result = validateLevel(state);
       expect(result.valid).toBe(false);
@@ -849,12 +842,8 @@ describe("validateLevel - 自定义关卡校验", () => {
         timeLimit: 120,
         gridSize: 25,
         snapRadius: 60,
-        pieceDefs: [
-          { id: "p1", label: "碎片1", slot: { x: 20, y: 30 }, layerId: "layer_0" }
-        ],
-        layers: [
-          { id: "layer_0", name: "层1", gridSize: 25, buried: { 30: "p1" } }
-        ]
+        pieceDefs: [{ id: "p1", label: "碎片1", slot: { x: 20, y: 30 }, layerId: "layer_0" }],
+        layers: [{ id: "layer_0", name: "层1", gridSize: 25, buried: { 30: "p1" } }]
       };
       const result = validateLevel(state);
       expect(result.valid).toBe(false);
@@ -867,12 +856,8 @@ describe("validateLevel - 自定义关卡校验", () => {
         timeLimit: 120,
         gridSize: 25,
         snapRadius: 60,
-        pieceDefs: [
-          { id: "p1", label: "碎片1", slot: { x: 20, y: 30 }, layerId: "layer_0" }
-        ],
-        layers: [
-          { id: "layer_0", name: "层1", gridSize: 25, buried: { "-1": "p1" } }
-        ]
+        pieceDefs: [{ id: "p1", label: "碎片1", slot: { x: 20, y: 30 }, layerId: "layer_0" }],
+        layers: [{ id: "layer_0", name: "层1", gridSize: 25, buried: { "-1": "p1" } }]
       };
       const result = validateLevel(state);
       expect(result.valid).toBe(false);
@@ -899,13 +884,16 @@ describe("validateLevel - 自定义关卡校验", () => {
       };
       const originalEntries = Object.entries;
       const originalKeys = Object.keys;
-      Object.entries = function(obj) {
+      Object.entries = function (obj) {
         if (obj === state.layers[0].buried) {
-          return [["5", "p1"], ["5", "p2"]];
+          return [
+            ["5", "p1"],
+            ["5", "p2"]
+          ];
         }
         return originalEntries.call(Object, obj);
       };
-      Object.keys = function(obj) {
+      Object.keys = function (obj) {
         if (obj === state.layers[0].buried) {
           return ["5", "5"];
         }
@@ -914,9 +902,8 @@ describe("validateLevel - 自定义关卡校验", () => {
       try {
         const result = validateLevel(state);
         expect(result.valid).toBe(false);
-        const hasError = result.errors.some(e =>
-          (e.includes("探方格") && e.includes("重复使用")) ||
-          e.includes("同一个探方格")
+        const hasError = result.errors.some(
+          e => (e.includes("探方格") && e.includes("重复使用")) || e.includes("同一个探方格")
         );
         expect(hasError).toBe(true);
       } finally {
@@ -972,20 +959,27 @@ describe("validateLevel - 自定义关卡校验", () => {
     it("多个碎片使用同一格应报错（模拟数据损坏场景）", () => {
       const state = createValidState();
       const originalEntries = Object.entries;
-      Object.entries = function(obj) {
+      Object.entries = function (obj) {
         if (obj === state.buried) {
-          return [["2", "p1"], ["2", "p2"], ["8", "p3"]];
+          return [
+            ["2", "p1"],
+            ["2", "p2"],
+            ["8", "p3"]
+          ];
         }
         return originalEntries.call(Object, obj);
       };
       try {
         const result = validateLevel(state);
         expect(result.valid).toBe(false);
-        expect(result.errors.some(e =>
-          e.includes("同一个探方格") ||
-          e.includes("还没有设置埋藏位置") ||
-          e.includes("重复使用")
-        )).toBe(true);
+        expect(
+          result.errors.some(
+            e =>
+              e.includes("同一个探方格") ||
+              e.includes("还没有设置埋藏位置") ||
+              e.includes("重复使用")
+          )
+        ).toBe(true);
       } finally {
         Object.entries = originalEntries;
       }
@@ -1022,12 +1016,8 @@ describe("validateLevel - 自定义关卡校验", () => {
         timeLimit: 120,
         gridSize: 25,
         snapRadius: 60,
-        pieceDefs: [
-          { id: "p1", label: "碎片1", slot: { x: 20, y: 30 }, layerId: "layer_0" }
-        ],
-        layers: [
-          { id: "layer_0", name: "层1", gridSize: 25, buried: { 2: "p1", 5: "p999" } }
-        ]
+        pieceDefs: [{ id: "p1", label: "碎片1", slot: { x: 20, y: 30 }, layerId: "layer_0" }],
+        layers: [{ id: "layer_0", name: "层1", gridSize: 25, buried: { 2: "p1", 5: "p999" } }]
       };
       const result = validateLevel(state);
       expect(result.warnings.some(w => w.includes("p999"))).toBe(true);

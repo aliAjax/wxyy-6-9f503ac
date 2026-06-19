@@ -72,7 +72,9 @@ function expect(actual) {
         }
       } else if (Array.isArray(actual)) {
         if (!actual.includes(item)) {
-          throw new Error(`Expected array to contain ${JSON.stringify(item)}, but got ${JSON.stringify(actual)}`);
+          throw new Error(
+            `Expected array to contain ${JSON.stringify(item)}, but got ${JSON.stringify(actual)}`
+          );
         }
       } else {
         throw new Error(`toContain can only be used on strings or arrays`);

@@ -2,7 +2,23 @@
   "name": "archaeology-puzzle",
   "version": "1.0.0",
   "description": "考古现场拼碎片游戏",
+  "main": "core.js",
   "scripts": {
-    "test": "node test/runner.js"
+    "start": "http-server . -p 8080 -c-1 -o",
+    "dev": "http-server . -p 8080 -c-1",
+    "serve": "http-server . -p 8080 -c-1",
+    "test": "node test/runner.js",
+    "lint": "eslint \"*.js\" \"test/**/*.js\"",
+    "lint:fix": "eslint \"*.js\" \"test/**/*.js\" --fix",
+    "format": "prettier --write \"*.{js,css,html,json}\" \"test/**/*.js\"",
+    "format:check": "prettier --check \"*.{js,css,html,json}\" \"test/**/*.js\"",
+    "validate": "node scripts/validate-static.js",
+    "check": "npm run lint && npm run format:check && npm run validate && npm test"
+  },
+  "devDependencies": {
+    "eslint": "^8.57.0",
+    "eslint-config-prettier": "^9.1.0",
+    "http-server": "^14.1.1",
+    "prettier": "^3.2.5"
   }
 }

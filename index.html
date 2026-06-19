@@ -1,534 +1,654 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-CN">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>考古现场拼碎片</title>
-  <link rel="stylesheet" href="style.css">
-</head>
-<body>
-  <main class="shell">
-    <header class="header">
-      <div>
-        <p class="eyebrow">Field Lab Puzzle</p>
-        <h1>考古现场拼碎片</h1>
-      </div>
-      <div class="header-actions">
-        <button id="archiveBtn" type="button" class="archive-btn">修复档案</button>
-        <button id="tutorialBtn" type="button" class="tutorial-btn">📖 教学</button>
-        <button id="settingsBtn" type="button" class="settings-btn">⚙️ 设置</button>
-        <div class="stats">
-          <span>时间 <strong id="timeLeft">90</strong></span>
-          <span>挖掘 <strong id="digCount">0</strong></span>
-          <span>完整度 <strong id="progress">0%</strong></span>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>考古现场拼碎片</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="header">
+        <div>
+          <p class="eyebrow">Field Lab Puzzle</p>
+          <h1>考古现场拼碎片</h1>
         </div>
-      </div>
-    </header>
-
-    <section id="levelSelect" class="level-select">
-      <div class="level-select-header">
-        <h2>选择修复任务</h2>
-        <div class="level-select-actions">
-          <button id="openEditorBtn" type="button" class="editor-entry-btn">🛠️ 关卡编辑器</button>
-        </div>
-      </div>
-
-      <div id="levelPreview" class="level-preview hidden">
-        <button id="closePreviewBtn" type="button" class="close-preview-btn" aria-label="关闭预览">&times;</button>
-        <div class="preview-content">
-          <div class="preview-left">
-            <div id="previewIcon" class="preview-icon level-icon"></div>
-            <div class="preview-basic">
-              <h3 id="previewName" class="preview-name"></h3>
-              <span id="previewDifficulty" class="preview-difficulty"></span>
-            </div>
+        <div class="header-actions">
+          <button id="archiveBtn" type="button" class="archive-btn">修复档案</button>
+          <button id="tutorialBtn" type="button" class="tutorial-btn">📖 教学</button>
+          <button id="settingsBtn" type="button" class="settings-btn">⚙️ 设置</button>
+          <div class="stats">
+            <span>时间 <strong id="timeLeft">90</strong></span>
+            <span>挖掘 <strong id="digCount">0</strong></span>
+            <span>完整度 <strong id="progress">0%</strong></span>
           </div>
-          <div class="preview-right">
-            <div class="preview-section">
-              <h4 class="preview-section-title">器物说明</h4>
-              <p id="previewDescription" class="preview-description"></p>
-            </div>
-            <div class="preview-stats">
-              <div class="preview-stat">
-                <span class="preview-stat-label">碎片数量</span>
-                <strong id="previewPieceCount" class="preview-stat-value"></strong>
-              </div>
-              <div class="preview-stat">
-                <span class="preview-stat-label">倒计时</span>
-                <strong id="previewTimeLimit" class="preview-stat-value"></strong>
-              </div>
-              <div class="preview-stat">
-                <span class="preview-stat-label">最佳成绩</span>
-                <strong id="previewBestScore" class="preview-stat-value"></strong>
+        </div>
+      </header>
+
+      <section id="levelSelect" class="level-select">
+        <div class="level-select-header">
+          <h2>选择修复任务</h2>
+          <div class="level-select-actions">
+            <button id="openEditorBtn" type="button" class="editor-entry-btn">🛠️ 关卡编辑器</button>
+          </div>
+        </div>
+
+        <div id="levelPreview" class="level-preview hidden">
+          <button
+            id="closePreviewBtn"
+            type="button"
+            class="close-preview-btn"
+            aria-label="关闭预览"
+          >
+            &times;
+          </button>
+          <div class="preview-content">
+            <div class="preview-left">
+              <div id="previewIcon" class="preview-icon level-icon"></div>
+              <div class="preview-basic">
+                <h3 id="previewName" class="preview-name"></h3>
+                <span id="previewDifficulty" class="preview-difficulty"></span>
               </div>
             </div>
-            <div class="preview-section">
-              <h4 class="preview-section-title">可用工具</h4>
-              <div id="previewTools" class="preview-tools"></div>
-            </div>
-            <div class="preview-section" id="previewGoalsSection">
-              <h4 class="preview-section-title">🎯 修复目标</h4>
-              <div id="previewGoals" class="preview-goals"></div>
-            </div>
-            <div class="preview-section" id="previewLayersSection">
-              <h4 class="preview-section-title">🏛️ 文化层</h4>
-              <div id="previewLayers" class="preview-layers"></div>
-            </div>
-            <div class="preview-actions">
-              <button id="previewToggleModeBtn" type="button" class="preview-toggle-mode-btn hidden">🔄 切换练习/正式模式</button>
-              <button id="previewStartBtn" type="button" class="preview-start-btn">🎮 开始修复</button>
-              <button id="previewCopyBtn" type="button" class="preview-copy-btn">📋 复制为自定义关卡</button>
+            <div class="preview-right">
+              <div class="preview-section">
+                <h4 class="preview-section-title">器物说明</h4>
+                <p id="previewDescription" class="preview-description"></p>
+              </div>
+              <div class="preview-stats">
+                <div class="preview-stat">
+                  <span class="preview-stat-label">碎片数量</span>
+                  <strong id="previewPieceCount" class="preview-stat-value"></strong>
+                </div>
+                <div class="preview-stat">
+                  <span class="preview-stat-label">倒计时</span>
+                  <strong id="previewTimeLimit" class="preview-stat-value"></strong>
+                </div>
+                <div class="preview-stat">
+                  <span class="preview-stat-label">最佳成绩</span>
+                  <strong id="previewBestScore" class="preview-stat-value"></strong>
+                </div>
+              </div>
+              <div class="preview-section">
+                <h4 class="preview-section-title">可用工具</h4>
+                <div id="previewTools" class="preview-tools"></div>
+              </div>
+              <div class="preview-section" id="previewGoalsSection">
+                <h4 class="preview-section-title">🎯 修复目标</h4>
+                <div id="previewGoals" class="preview-goals"></div>
+              </div>
+              <div class="preview-section" id="previewLayersSection">
+                <h4 class="preview-section-title">🏛️ 文化层</h4>
+                <div id="previewLayers" class="preview-layers"></div>
+              </div>
+              <div class="preview-actions">
+                <button
+                  id="previewToggleModeBtn"
+                  type="button"
+                  class="preview-toggle-mode-btn hidden"
+                >
+                  🔄 切换练习/正式模式
+                </button>
+                <button id="previewStartBtn" type="button" class="preview-start-btn">
+                  🎮 开始修复
+                </button>
+                <button id="previewCopyBtn" type="button" class="preview-copy-btn">
+                  📋 复制为自定义关卡
+                </button>
+              </div>
             </div>
           </div>
         </div>
-      </div>
 
-      <div id="presetLevels" class="level-list-section">
-        <h3 class="section-subtitle">官方关卡</h3>
-        <div class="level-list">
+        <div id="presetLevels" class="level-list-section">
+          <h3 class="section-subtitle">官方关卡</h3>
+          <div class="level-list"></div>
         </div>
-      </div>
-      <div id="customLevelsSection" class="level-list-section hidden">
-        <h3 class="section-subtitle">自定义关卡</h3>
-        <div id="customLevelList" class="level-list">
+        <div id="customLevelsSection" class="level-list-section hidden">
+          <h3 class="section-subtitle">自定义关卡</h3>
+          <div id="customLevelList" class="level-list"></div>
         </div>
-      </div>
-    </section>
+      </section>
 
-    <section id="levelEditor" class="level-editor hidden">
-      <div class="editor-header">
-        <h2>🛠️ 关卡编辑器</h2>
-        <div class="editor-header-actions">
-          <button id="duplicateLevelBtn" type="button" class="editor-btn">📋 复制当前关卡</button>
-          <button id="editorBackBtn" type="button" class="secondary-btn">← 返回</button>
-        </div>
-      </div>
-
-      <div class="editor-layout">
-        <div class="editor-panel">
-          <h3>基础设置</h3>
-          <div class="form-group">
-            <label for="editorLevelName">关卡名称</label>
-            <input type="text" id="editorLevelName" maxlength="20" placeholder="例如：神秘玉琮">
+      <section id="levelEditor" class="level-editor hidden">
+        <div class="editor-header">
+          <h2>🛠️ 关卡编辑器</h2>
+          <div class="editor-header-actions">
+            <button id="duplicateLevelBtn" type="button" class="editor-btn">📋 复制当前关卡</button>
+            <button id="editorBackBtn" type="button" class="secondary-btn">← 返回</button>
           </div>
-          <div class="form-group">
-            <label for="editorDescription">说明文字</label>
-            <textarea id="editorDescription" rows="3" maxlength="200" placeholder="关卡背景说明..."></textarea>
-          </div>
-          <div class="form-row">
+        </div>
+
+        <div class="editor-layout">
+          <div class="editor-panel">
+            <h3>基础设置</h3>
             <div class="form-group">
-              <label for="editorTimeLimit">倒计时（秒）</label>
-              <input type="number" id="editorTimeLimit" min="30" max="600" value="120">
+              <label for="editorLevelName">关卡名称</label>
+              <input type="text" id="editorLevelName" maxlength="20" placeholder="例如：神秘玉琮" />
             </div>
             <div class="form-group">
-              <label for="editorGridSize">探方尺寸</label>
-              <select id="editorGridSize">
-                <option value="16">4 × 4</option>
-                <option value="25" selected>5 × 5</option>
-                <option value="36">6 × 6</option>
+              <label for="editorDescription">说明文字</label>
+              <textarea
+                id="editorDescription"
+                rows="3"
+                maxlength="200"
+                placeholder="关卡背景说明..."
+              ></textarea>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="editorTimeLimit">倒计时（秒）</label>
+                <input type="number" id="editorTimeLimit" min="30" max="600" value="120" />
+              </div>
+              <div class="form-group">
+                <label for="editorGridSize">探方尺寸</label>
+                <select id="editorGridSize">
+                  <option value="16">4 × 4</option>
+                  <option value="25" selected>5 × 5</option>
+                  <option value="36">6 × 6</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="editorPieceName">碎片名称</label>
+                <input type="text" id="editorPieceName" maxlength="10" value="碎片" />
+              </div>
+              <div class="form-group">
+                <label for="editorSnapRadius">贴合半径</label>
+                <input type="number" id="editorSnapRadius" min="30" max="150" value="60" />
+              </div>
+            </div>
+            <div class="form-group">
+              <label>器物外观样式</label>
+              <div class="style-presets">
+                <button
+                  type="button"
+                  class="style-preset-btn bowl-style active"
+                  data-style="bowl"
+                  title="陶碗样式"
+                >
+                  🍯
+                </button>
+                <button
+                  type="button"
+                  class="style-preset-btn tile-style"
+                  data-style="tile"
+                  title="瓦当样式"
+                >
+                  🏺
+                </button>
+                <button
+                  type="button"
+                  class="style-preset-btn mirror-style"
+                  data-style="mirror"
+                  title="铜镜样式"
+                >
+                  🪞
+                </button>
+                <button
+                  type="button"
+                  class="style-preset-btn jade-style"
+                  data-style="jade"
+                  title="玉器样式"
+                >
+                  💎
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="editor-panel">
+            <h3>🎯 修复目标</h3>
+            <p class="editor-hint">设置本关卡的额外挑战目标，达成可获得最佳成绩加成。</p>
+            <div id="editorGoalsList" class="editor-goals-list"></div>
+          </div>
+
+          <div class="editor-panel">
+            <h3>🏛️ 文化层配置 <span class="layer-count-badge" id="layerCountBadge">1</span></h3>
+            <p class="editor-hint">
+              配置多个文化层，每层独立的探方网格、埋藏和事件。上层清理完毕后才能发掘下层。
+            </p>
+            <div class="editor-layer-actions">
+              <button id="addLayerBtn" type="button" class="editor-btn">+ 添加地层</button>
+              <button id="removeLayerBtn" type="button" class="editor-btn danger">
+                - 删除当前层
+              </button>
+            </div>
+            <div id="editorLayerTabs" class="editor-layer-tabs"></div>
+            <div class="form-group" style="margin-top: 12px">
+              <label for="editorLayerName">地层名称</label>
+              <input
+                type="text"
+                id="editorLayerName"
+                maxlength="15"
+                placeholder="例如：表土层、文化层A"
+              />
+            </div>
+            <div class="form-group">
+              <label for="editorLayerDesc">地层说明</label>
+              <textarea
+                id="editorLayerDesc"
+                rows="2"
+                maxlength="100"
+                placeholder="该层的年代、土质、特点说明..."
+              ></textarea>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="editorLayerGridSize">本层探方尺寸</label>
+                <select id="editorLayerGridSize">
+                  <option value="16">4 × 4</option>
+                  <option value="25" selected>5 × 5</option>
+                  <option value="36">6 × 6</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="editorLayerColor">土层颜色</label>
+                <input type="color" id="editorLayerColor" value="#d4b896" />
+              </div>
+            </div>
+            <div class="form-group">
+              <label>随机事件权重调整</label>
+              <div class="event-weight-list" id="eventWeightList"></div>
+            </div>
+          </div>
+
+          <div class="editor-panel">
+            <h3>碎片管理 <span class="piece-count-badge" id="pieceCountBadge">0</span></h3>
+            <div class="editor-piece-actions">
+              <button id="addPieceBtn" type="button" class="editor-btn">+ 添加碎片</button>
+              <button id="clearPiecesBtn" type="button" class="editor-btn danger">清空碎片</button>
+            </div>
+            <div class="form-group" style="margin-top: 12px">
+              <label for="editorPieceLayer">所属地层</label>
+              <select id="editorPieceLayer">
+                <option value="0">第 1 层</option>
               </select>
             </div>
+            <div id="pieceListEditor" class="piece-list-editor"></div>
           </div>
-          <div class="form-row">
-            <div class="form-group">
-              <label for="editorPieceName">碎片名称</label>
-              <input type="text" id="editorPieceName" maxlength="10" value="碎片">
-            </div>
-            <div class="form-group">
-              <label for="editorSnapRadius">贴合半径</label>
-              <input type="number" id="editorSnapRadius" min="30" max="150" value="60">
-            </div>
+
+          <div class="editor-panel editor-visual-panel">
+            <h3>探方编辑</h3>
+            <p class="editor-hint" id="digHint">点击探方格放置选中碎片的埋藏位置，再次点击移除。</p>
+            <div id="editorGrid" class="editor-grid"></div>
           </div>
-          <div class="form-group">
-            <label>器物外观样式</label>
-            <div class="style-presets">
-              <button type="button" class="style-preset-btn bowl-style active" data-style="bowl" title="陶碗样式">🍯</button>
-              <button type="button" class="style-preset-btn tile-style" data-style="tile" title="瓦当样式">🏺</button>
-              <button type="button" class="style-preset-btn mirror-style" data-style="mirror" title="铜镜样式">🪞</button>
-              <button type="button" class="style-preset-btn jade-style" data-style="jade" title="玉器样式">💎</button>
+
+          <div class="editor-panel editor-visual-panel">
+            <h3>修复台编辑</h3>
+            <p class="editor-hint" id="slotHint">
+              在目标区域内拖动设置碎片槽位，双击槽位可旋转角度。
+            </p>
+            <div class="editor-workbench">
+              <div id="editorTarget" class="editor-target">
+                <div id="editorTargetInner" class="editor-target-inner"></div>
+              </div>
             </div>
           </div>
         </div>
 
-        <div class="editor-panel">
-          <h3>🎯 修复目标</h3>
-          <p class="editor-hint">设置本关卡的额外挑战目标，达成可获得最佳成绩加成。</p>
-          <div id="editorGoalsList" class="editor-goals-list"></div>
+        <div class="editor-footer">
+          <div id="validationResult" class="validation-result"></div>
+          <div class="editor-footer-actions">
+            <button id="validateBtn" type="button" class="editor-btn">✓ 校验配置</button>
+            <button id="previewBtn" type="button" class="editor-btn">🎮 预览试玩</button>
+            <button id="saveLevelBtn" type="button" class="editor-btn primary">💾 保存关卡</button>
+            <button id="exportLevelBtn" type="button" class="editor-btn">📤 导出JSON</button>
+            <button id="importLevelBtn" type="button" class="editor-btn">📥 导入JSON</button>
+            <input type="file" id="importFileInput" accept=".json" style="display: none" />
+          </div>
         </div>
+      </section>
 
-        <div class="editor-panel">
-          <h3>🏛️ 文化层配置 <span class="layer-count-badge" id="layerCountBadge">1</span></h3>
-          <p class="editor-hint">配置多个文化层，每层独立的探方网格、埋藏和事件。上层清理完毕后才能发掘下层。</p>
-          <div class="editor-layer-actions">
-            <button id="addLayerBtn" type="button" class="editor-btn">+ 添加地层</button>
-            <button id="removeLayerBtn" type="button" class="editor-btn danger">- 删除当前层</button>
+      <div id="importPreviewModal" class="modal hidden">
+        <div class="modal-content import-preview-content">
+          <div class="modal-header">
+            <h2>📥 导入预览</h2>
+            <button type="button" class="close-btn" id="importPreviewCloseBtn">&times;</button>
           </div>
-          <div id="editorLayerTabs" class="editor-layer-tabs"></div>
-          <div class="form-group" style="margin-top:12px;">
-            <label for="editorLayerName">地层名称</label>
-            <input type="text" id="editorLayerName" maxlength="15" placeholder="例如：表土层、文化层A">
-          </div>
-          <div class="form-group">
-            <label for="editorLayerDesc">地层说明</label>
-            <textarea id="editorLayerDesc" rows="2" maxlength="100" placeholder="该层的年代、土质、特点说明..."></textarea>
-          </div>
-          <div class="form-row">
-            <div class="form-group">
-              <label for="editorLayerGridSize">本层探方尺寸</label>
-              <select id="editorLayerGridSize">
-                <option value="16">4 × 4</option>
-                <option value="25" selected>5 × 5</option>
-                <option value="36">6 × 6</option>
-              </select>
+          <div class="modal-body import-preview-body">
+            <div class="import-preview-summary">
+              <div class="import-preview-field">
+                <span class="import-preview-label">关卡名称</span>
+                <span class="import-preview-value" id="importPreviewName">—</span>
+              </div>
+              <div class="import-preview-field">
+                <span class="import-preview-label">探方尺寸</span>
+                <span class="import-preview-value" id="importPreviewSize">—</span>
+              </div>
+              <div class="import-preview-field">
+                <span class="import-preview-label">碎片数量</span>
+                <span class="import-preview-value" id="importPreviewPieceCount">—</span>
+              </div>
+              <div class="import-preview-field">
+                <span class="import-preview-label">器物样式</span>
+                <span class="import-preview-value" id="importPreviewStyle">—</span>
+              </div>
+              <div class="import-preview-field">
+                <span class="import-preview-label">倒计时</span>
+                <span class="import-preview-value" id="importPreviewTimeLimit">—</span>
+              </div>
+              <div class="import-preview-field">
+                <span class="import-preview-label">贴合半径</span>
+                <span class="import-preview-value" id="importPreviewSnapRadius">—</span>
+              </div>
             </div>
-            <div class="form-group">
-              <label for="editorLayerColor">土层颜色</label>
-              <input type="color" id="editorLayerColor" value="#d4b896">
-            </div>
+            <div id="importPreviewIssues" class="import-preview-issues"></div>
+            <div id="importPreviewWarnings" class="import-preview-warnings"></div>
           </div>
-          <div class="form-group">
-            <label>随机事件权重调整</label>
-            <div class="event-weight-list" id="eventWeightList"></div>
-          </div>
-        </div>
-
-        <div class="editor-panel">
-          <h3>碎片管理 <span class="piece-count-badge" id="pieceCountBadge">0</span></h3>
-          <div class="editor-piece-actions">
-            <button id="addPieceBtn" type="button" class="editor-btn">+ 添加碎片</button>
-            <button id="clearPiecesBtn" type="button" class="editor-btn danger">清空碎片</button>
-          </div>
-          <div class="form-group" style="margin-top:12px;">
-            <label for="editorPieceLayer">所属地层</label>
-            <select id="editorPieceLayer">
-              <option value="0">第 1 层</option>
-            </select>
-          </div>
-          <div id="pieceListEditor" class="piece-list-editor"></div>
-        </div>
-
-        <div class="editor-panel editor-visual-panel">
-          <h3>探方编辑</h3>
-          <p class="editor-hint" id="digHint">点击探方格放置选中碎片的埋藏位置，再次点击移除。</p>
-          <div id="editorGrid" class="editor-grid"></div>
-        </div>
-
-        <div class="editor-panel editor-visual-panel">
-          <h3>修复台编辑</h3>
-          <p class="editor-hint" id="slotHint">在目标区域内拖动设置碎片槽位，双击槽位可旋转角度。</p>
-          <div class="editor-workbench">
-            <div id="editorTarget" class="editor-target">
-              <div id="editorTargetInner" class="editor-target-inner"></div>
-            </div>
+          <div class="modal-footer import-preview-footer">
+            <button type="button" class="editor-btn" id="importPreviewCancelBtn">取消</button>
+            <button type="button" class="editor-btn primary" id="importPreviewConfirmBtn">
+              确认导入
+            </button>
           </div>
         </div>
       </div>
 
-      <div class="editor-footer">
-        <div id="validationResult" class="validation-result"></div>
-        <div class="editor-footer-actions">
-          <button id="validateBtn" type="button" class="editor-btn">✓ 校验配置</button>
-          <button id="previewBtn" type="button" class="editor-btn">🎮 预览试玩</button>
-          <button id="saveLevelBtn" type="button" class="editor-btn primary">💾 保存关卡</button>
-          <button id="exportLevelBtn" type="button" class="editor-btn">📤 导出JSON</button>
-          <button id="importLevelBtn" type="button" class="editor-btn">📥 导入JSON</button>
-          <input type="file" id="importFileInput" accept=".json" style="display:none">
+      <section id="gameArea" class="layout hidden">
+        <div class="mobile-tabs" role="tablist" aria-label="游戏区域切换">
+          <button
+            class="mobile-tab-btn active"
+            data-tab="dig"
+            role="tab"
+            aria-selected="true"
+            aria-controls="digTab"
+            tabindex="0"
+          >
+            ⛏️ 探方
+          </button>
+          <button
+            class="mobile-tab-btn"
+            data-tab="repair"
+            role="tab"
+            aria-selected="false"
+            aria-controls="repairTab"
+            tabindex="-1"
+          >
+            🔧 修复
+          </button>
+          <button
+            class="mobile-tab-btn"
+            data-tab="notes"
+            role="tab"
+            aria-selected="false"
+            aria-controls="notesTab"
+            tabindex="-1"
+          >
+            📝 记录
+          </button>
         </div>
-      </div>
-    </section>
+        <section class="dig-site" id="digTab" role="tabpanel">
+          <div class="section-title">
+            <h2>探方 · <span id="levelName">陶碗</span></h2>
+            <div class="section-actions">
+              <button id="hintBtn" type="button" class="hint-btn">提示</button>
+              <button id="startBtn" type="button">开始挖掘</button>
+            </div>
+          </div>
+          <p id="levelDescription" class="level-description hidden"></p>
 
-    <div id="importPreviewModal" class="modal hidden">
-      <div class="modal-content import-preview-content">
+          <div id="layerPanel" class="layer-panel hidden">
+            <div class="layer-tabs" id="layerTabs" role="tablist" aria-label="地层切换"></div>
+            <div class="layer-info" id="layerInfo"></div>
+          </div>
+
+          <div class="tools-panel">
+            <button id="probeBtn" type="button" class="tool-btn" data-tool="probe"></button>
+            <button id="brushBtn" type="button" class="tool-btn" data-tool="brush"></button>
+            <button id="compassBtn" type="button" class="tool-btn" data-tool="compass"></button>
+            <button id="trowelBtn" type="button" class="tool-btn" data-tool="trowel"></button>
+          </div>
+
+          <div id="grid" class="grid"></div>
+          <div id="goalsPanel" class="goals-panel hidden">
+            <div class="goals-panel-header">🎯 修复目标</div>
+            <div id="goalsList" class="goals-list"></div>
+          </div>
+          <div id="compassIndicator" class="compass-indicator hidden">
+            <div class="compass-arrow"></div>
+            <div class="compass-distance"></div>
+          </div>
+        </section>
+
+        <section class="lab" id="repairTab" role="tabpanel">
+          <div class="section-title">
+            <h2>修复台</h2>
+            <div class="section-actions">
+              <button id="focusBtn" type="button" class="lab-focus-btn">⛶ 全屏</button>
+              <button id="restartBtn" type="button">重来</button>
+            </div>
+          </div>
+          <div class="workbench">
+            <div id="target" class="target"></div>
+            <div id="pieces" class="pieces"></div>
+          </div>
+        </section>
+
+        <aside class="notes" id="notesTab" role="tabpanel">
+          <h2>现场记录</h2>
+          <div id="log" class="log"></div>
+        </aside>
+      </section>
+
+      <section id="result" class="result hidden"></section>
+
+      <button id="backBtn" type="button" class="back-btn hidden">← 返回选择任务</button>
+    </main>
+
+    <div id="archiveModal" class="modal hidden">
+      <div class="modal-content">
         <div class="modal-header">
-          <h2>📥 导入预览</h2>
-          <button type="button" class="close-btn" id="importPreviewCloseBtn">&times;</button>
+          <h2>修复档案</h2>
+          <button id="closeArchiveBtn" type="button" class="close-btn">&times;</button>
         </div>
-        <div class="modal-body import-preview-body">
-          <div class="import-preview-summary">
-            <div class="import-preview-field">
-              <span class="import-preview-label">关卡名称</span>
-              <span class="import-preview-value" id="importPreviewName">—</span>
-            </div>
-            <div class="import-preview-field">
-              <span class="import-preview-label">探方尺寸</span>
-              <span class="import-preview-value" id="importPreviewSize">—</span>
-            </div>
-            <div class="import-preview-field">
-              <span class="import-preview-label">碎片数量</span>
-              <span class="import-preview-value" id="importPreviewPieceCount">—</span>
-            </div>
-            <div class="import-preview-field">
-              <span class="import-preview-label">器物样式</span>
-              <span class="import-preview-value" id="importPreviewStyle">—</span>
-            </div>
-            <div class="import-preview-field">
-              <span class="import-preview-label">倒计时</span>
-              <span class="import-preview-value" id="importPreviewTimeLimit">—</span>
-            </div>
-            <div class="import-preview-field">
-              <span class="import-preview-label">贴合半径</span>
-              <span class="import-preview-value" id="importPreviewSnapRadius">—</span>
-            </div>
+        <div class="modal-body">
+          <div class="archive-tabs">
+            <button class="tab-btn active" data-tab="recent">最近记录</button>
+            <button class="tab-btn" data-tab="best">最佳成绩</button>
+            <button class="tab-btn" data-tab="stats">统计分析</button>
           </div>
-          <div id="importPreviewIssues" class="import-preview-issues"></div>
-          <div id="importPreviewWarnings" class="import-preview-warnings"></div>
+          <div id="recentTab" class="tab-content active">
+            <div id="recentRecords" class="records-list"></div>
+          </div>
+          <div id="bestTab" class="tab-content">
+            <div id="bestRecords" class="records-list"></div>
+          </div>
+          <div id="statsTab" class="tab-content">
+            <div id="statsOverview" class="stats-overview"></div>
+            <div class="stats-level-filter">
+              <button class="level-filter-btn active" data-filter="all">全部关卡</button>
+              <button class="level-filter-btn" data-filter="official">官方关卡</button>
+              <button class="level-filter-btn" data-filter="custom">自定义关卡</button>
+              <button class="level-filter-btn" data-filter="daily">每日挑战</button>
+            </div>
+            <div id="statsLevelList" class="stats-level-list"></div>
+          </div>
         </div>
-        <div class="modal-footer import-preview-footer">
-          <button type="button" class="editor-btn" id="importPreviewCancelBtn">取消</button>
-          <button type="button" class="editor-btn primary" id="importPreviewConfirmBtn">确认导入</button>
+        <div class="modal-footer">
+          <button id="clearArchiveBtn" type="button" class="clear-btn">清空记录</button>
         </div>
       </div>
     </div>
 
-    <section id="gameArea" class="layout hidden">
-      <div class="mobile-tabs" role="tablist" aria-label="游戏区域切换">
-        <button class="mobile-tab-btn active" data-tab="dig" role="tab" aria-selected="true" aria-controls="digTab" tabindex="0">⛏️ 探方</button>
-        <button class="mobile-tab-btn" data-tab="repair" role="tab" aria-selected="false" aria-controls="repairTab" tabindex="-1">🔧 修复</button>
-        <button class="mobile-tab-btn" data-tab="notes" role="tab" aria-selected="false" aria-controls="notesTab" tabindex="-1">📝 记录</button>
-      </div>
-      <section class="dig-site" id="digTab" role="tabpanel">
-        <div class="section-title">
-          <h2>探方 · <span id="levelName">陶碗</span></h2>
-          <div class="section-actions">
-            <button id="hintBtn" type="button" class="hint-btn">提示</button>
-            <button id="startBtn" type="button">开始挖掘</button>
-          </div>
+    <div id="tutorialOverlay" class="tutorial-overlay hidden">
+      <div id="tutorialSpotlight" class="tutorial-spotlight"></div>
+      <div id="tutorialTooltip" class="tutorial-tooltip">
+        <div class="tutorial-step-indicator"></div>
+        <p class="tutorial-text"></p>
+        <div class="tutorial-actions">
+          <button type="button" class="tutorial-skip-btn">跳过教学</button>
+          <button type="button" class="tutorial-next-btn">下一步</button>
         </div>
-        <p id="levelDescription" class="level-description hidden"></p>
-
-        <div id="layerPanel" class="layer-panel hidden">
-          <div class="layer-tabs" id="layerTabs" role="tablist" aria-label="地层切换"></div>
-          <div class="layer-info" id="layerInfo"></div>
-        </div>
-
-        <div class="tools-panel">
-          <button id="probeBtn" type="button" class="tool-btn" data-tool="probe">
-          </button>
-          <button id="brushBtn" type="button" class="tool-btn" data-tool="brush">
-          </button>
-          <button id="compassBtn" type="button" class="tool-btn" data-tool="compass">
-          </button>
-          <button id="trowelBtn" type="button" class="tool-btn" data-tool="trowel">
-          </button>
-        </div>
-
-        <div id="grid" class="grid"></div>
-        <div id="goalsPanel" class="goals-panel hidden">
-          <div class="goals-panel-header">🎯 修复目标</div>
-          <div id="goalsList" class="goals-list"></div>
-        </div>
-        <div id="compassIndicator" class="compass-indicator hidden">
-          <div class="compass-arrow"></div>
-          <div class="compass-distance"></div>
-        </div>
-      </section>
-
-      <section class="lab" id="repairTab" role="tabpanel">
-        <div class="section-title">
-          <h2>修复台</h2>
-          <div class="section-actions">
-            <button id="focusBtn" type="button" class="lab-focus-btn">⛶ 全屏</button>
-            <button id="restartBtn" type="button">重来</button>
-          </div>
-        </div>
-        <div class="workbench">
-          <div id="target" class="target">
-          </div>
-          <div id="pieces" class="pieces"></div>
-        </div>
-      </section>
-
-      <aside class="notes" id="notesTab" role="tabpanel">
-        <h2>现场记录</h2>
-        <div id="log" class="log"></div>
-      </aside>
-    </section>
-
-    <section id="result" class="result hidden"></section>
-
-    <button id="backBtn" type="button" class="back-btn hidden">← 返回选择任务</button>
-  </main>
-
-  <div id="archiveModal" class="modal hidden">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h2>修复档案</h2>
-        <button id="closeArchiveBtn" type="button" class="close-btn">&times;</button>
-      </div>
-      <div class="modal-body">
-        <div class="archive-tabs">
-          <button class="tab-btn active" data-tab="recent">最近记录</button>
-          <button class="tab-btn" data-tab="best">最佳成绩</button>
-          <button class="tab-btn" data-tab="stats">统计分析</button>
-        </div>
-        <div id="recentTab" class="tab-content active">
-          <div id="recentRecords" class="records-list"></div>
-        </div>
-        <div id="bestTab" class="tab-content">
-          <div id="bestRecords" class="records-list"></div>
-        </div>
-        <div id="statsTab" class="tab-content">
-          <div id="statsOverview" class="stats-overview"></div>
-          <div class="stats-level-filter">
-            <button class="level-filter-btn active" data-filter="all">全部关卡</button>
-            <button class="level-filter-btn" data-filter="official">官方关卡</button>
-            <button class="level-filter-btn" data-filter="custom">自定义关卡</button>
-            <button class="level-filter-btn" data-filter="daily">每日挑战</button>
-          </div>
-          <div id="statsLevelList" class="stats-level-list"></div>
-        </div>
-      </div>
-      <div class="modal-footer">
-        <button id="clearArchiveBtn" type="button" class="clear-btn">清空记录</button>
       </div>
     </div>
-  </div>
 
-  <div id="tutorialOverlay" class="tutorial-overlay hidden">
-    <div id="tutorialSpotlight" class="tutorial-spotlight"></div>
-    <div id="tutorialTooltip" class="tutorial-tooltip">
-      <div class="tutorial-step-indicator"></div>
-      <p class="tutorial-text"></p>
-      <div class="tutorial-actions">
-        <button type="button" class="tutorial-skip-btn">跳过教学</button>
-        <button type="button" class="tutorial-next-btn">下一步</button>
-      </div>
-    </div>
-  </div>
-
-  <div id="settingsModal" class="modal hidden">
-    <div class="modal-content settings-modal-content">
-      <div class="modal-header">
-        <h2>⚙️ 游戏设置</h2>
-        <button id="closeSettingsBtn" type="button" class="close-btn">&times;</button>
-      </div>
-      <div class="modal-body">
-        <div class="settings-group">
-          <div class="setting-item">
-            <div class="setting-info">
-              <div class="setting-label">现场事件提示动画</div>
-              <div class="setting-desc">随机事件触发时显示浮动提示动画</div>
+    <div id="settingsModal" class="modal hidden">
+      <div class="modal-content settings-modal-content">
+        <div class="modal-header">
+          <h2>⚙️ 游戏设置</h2>
+          <button id="closeSettingsBtn" type="button" class="close-btn">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="settings-group">
+            <div class="setting-item">
+              <div class="setting-info">
+                <div class="setting-label">现场事件提示动画</div>
+                <div class="setting-desc">随机事件触发时显示浮动提示动画</div>
+              </div>
+              <label class="toggle-switch">
+                <input type="checkbox" id="settingEventAnim" checked />
+                <span class="toggle-slider"></span>
+              </label>
             </div>
-            <label class="toggle-switch">
-              <input type="checkbox" id="settingEventAnim" checked>
-              <span class="toggle-slider"></span>
-            </label>
-          </div>
-          <div class="setting-item">
-            <div class="setting-info">
-              <div class="setting-label">移动端震动反馈</div>
-              <div class="setting-desc">拖拽碎片时提供触觉反馈（仅移动设备）</div>
+            <div class="setting-item">
+              <div class="setting-info">
+                <div class="setting-label">移动端震动反馈</div>
+                <div class="setting-desc">拖拽碎片时提供触觉反馈（仅移动设备）</div>
+              </div>
+              <label class="toggle-switch">
+                <input type="checkbox" id="settingVibration" checked />
+                <span class="toggle-slider"></span>
+              </label>
             </div>
-            <label class="toggle-switch">
-              <input type="checkbox" id="settingVibration" checked>
-              <span class="toggle-slider"></span>
-            </label>
-          </div>
-          <div class="setting-item">
-            <div class="setting-info">
-              <div class="setting-label">教学自动弹出</div>
-              <div class="setting-desc">首次进入关卡时自动展示新手教学</div>
+            <div class="setting-item">
+              <div class="setting-info">
+                <div class="setting-label">教学自动弹出</div>
+                <div class="setting-desc">首次进入关卡时自动展示新手教学</div>
+              </div>
+              <label class="toggle-switch">
+                <input type="checkbox" id="settingAutoTutorial" checked />
+                <span class="toggle-slider"></span>
+              </label>
             </div>
-            <label class="toggle-switch">
-              <input type="checkbox" id="settingAutoTutorial" checked>
-              <span class="toggle-slider"></span>
-            </label>
           </div>
         </div>
       </div>
     </div>
-  </div>
 
-  <div id="confirmModal" class="modal hidden">
-    <div class="modal-content confirm-modal">
-      <div class="modal-body">
-        <p class="confirm-message">确定要清空所有修复记录吗？此操作无法撤销。</p>
-      </div>
-      <div class="modal-footer">
-        <button id="cancelClearBtn" type="button" class="secondary-btn">取消</button>
-        <button id="confirmClearBtn" type="button" class="danger-btn">确认清空</button>
+    <div id="confirmModal" class="modal hidden">
+      <div class="modal-content confirm-modal">
+        <div class="modal-body">
+          <p class="confirm-message">确定要清空所有修复记录吗？此操作无法撤销。</p>
+        </div>
+        <div class="modal-footer">
+          <button id="cancelClearBtn" type="button" class="secondary-btn">取消</button>
+          <button id="confirmClearBtn" type="button" class="danger-btn">确认清空</button>
+        </div>
       </div>
     </div>
-  </div>
 
-  <div id="eventNotifContainer" class="event-notif-container"></div>
+    <div id="eventNotifContainer" class="event-notif-container"></div>
 
-  <div id="playbackModal" class="modal hidden">
-    <div class="modal-content playback-modal-content">
-      <div class="modal-header playback-header">
-        <div class="playback-title">
-          <h2 id="playbackLevelName">修复过程回放</h2>
-          <span id="playbackMeta" class="playback-meta"></span>
+    <div id="playbackModal" class="modal hidden">
+      <div class="modal-content playback-modal-content">
+        <div class="modal-header playback-header">
+          <div class="playback-title">
+            <h2 id="playbackLevelName">修复过程回放</h2>
+            <span id="playbackMeta" class="playback-meta"></span>
+          </div>
+          <div class="playback-header-actions">
+            <button id="playbackSpeedBtn" type="button" class="playback-speed-btn">▶ 1x</button>
+            <button id="closePlaybackBtn" type="button" class="close-btn">&times;</button>
+          </div>
         </div>
-        <div class="playback-header-actions">
-          <button id="playbackSpeedBtn" type="button" class="playback-speed-btn">▶ 1x</button>
-          <button id="closePlaybackBtn" type="button" class="close-btn">&times;</button>
-        </div>
-      </div>
-      <div class="modal-body playback-body">
-        <div id="playbackUnavailable" class="playback-unavailable hidden">
-          <div class="playback-unavailable-icon">📜</div>
-          <div class="playback-unavailable-title">此档案暂无回放数据</div>
-          <div class="playback-unavailable-desc">该记录创建于回放功能上线之前，无法进行过程回放。</div>
-          <div class="playback-unavailable-hint">完成新的修复任务后即可生成可回放的时间线记录。</div>
-        </div>
-        <div id="playbackContent" class="playback-content">
-          <div class="playback-stage">
-            <div class="playback-tabs">
-              <button class="playback-tab-btn active" data-playback-tab="dig">⛏️ 探方</button>
-              <button class="playback-tab-btn" data-playback-tab="repair">🔧 修复台</button>
+        <div class="modal-body playback-body">
+          <div id="playbackUnavailable" class="playback-unavailable hidden">
+            <div class="playback-unavailable-icon">📜</div>
+            <div class="playback-unavailable-title">此档案暂无回放数据</div>
+            <div class="playback-unavailable-desc">
+              该记录创建于回放功能上线之前，无法进行过程回放。
             </div>
-            <div id="playbackDigTab" class="playback-tab-panel active">
-              <div id="playbackGrid" class="playback-grid"></div>
-              <div id="playbackTools" class="playback-tools-panel"></div>
+            <div class="playback-unavailable-hint">
+              完成新的修复任务后即可生成可回放的时间线记录。
             </div>
-            <div id="playbackRepairTab" class="playback-tab-panel">
-              <div class="playback-workbench">
-                <div id="playbackTarget" class="playback-target"></div>
-                <div id="playbackPieces" class="playback-pieces"></div>
+          </div>
+          <div id="playbackContent" class="playback-content">
+            <div class="playback-stage">
+              <div class="playback-tabs">
+                <button class="playback-tab-btn active" data-playback-tab="dig">⛏️ 探方</button>
+                <button class="playback-tab-btn" data-playback-tab="repair">🔧 修复台</button>
+              </div>
+              <div id="playbackDigTab" class="playback-tab-panel active">
+                <div id="playbackGrid" class="playback-grid"></div>
+                <div id="playbackTools" class="playback-tools-panel"></div>
+              </div>
+              <div id="playbackRepairTab" class="playback-tab-panel">
+                <div class="playback-workbench">
+                  <div id="playbackTarget" class="playback-target"></div>
+                  <div id="playbackPieces" class="playback-pieces"></div>
+                </div>
+              </div>
+            </div>
+            <div class="playback-sidebar">
+              <div class="playback-stats">
+                <div class="playback-stat">
+                  <span class="playback-stat-label">⏱ 时间</span>
+                  <span class="playback-stat-value" id="playbackTime">0s</span>
+                </div>
+                <div class="playback-stat">
+                  <span class="playback-stat-label">⛏ 挖掘</span>
+                  <span class="playback-stat-value" id="playbackDigs">0</span>
+                </div>
+                <div class="playback-stat">
+                  <span class="playback-stat-label">🧩 完成</span>
+                  <span class="playback-stat-value" id="playbackProgress">0%</span>
+                </div>
+              </div>
+              <div class="playback-timeline-container">
+                <div class="playback-timeline-header">
+                  <span>📋 操作时间线</span>
+                  <span id="playbackStepInfo" class="playback-step-info">0 / 0</span>
+                </div>
+                <div id="playbackTimeline" class="playback-timeline"></div>
+              </div>
+              <div class="playback-controls">
+                <button
+                  id="playbackPrevBtn"
+                  type="button"
+                  class="playback-control-btn"
+                  title="上一步"
+                >
+                  ⏮
+                </button>
+                <button
+                  id="playbackPlayBtn"
+                  type="button"
+                  class="playback-control-btn playback-play-btn"
+                  title="播放/暂停"
+                >
+                  ▶
+                </button>
+                <button
+                  id="playbackNextBtn"
+                  type="button"
+                  class="playback-control-btn"
+                  title="下一步"
+                >
+                  ⏭
+                </button>
+                <button
+                  id="playbackRestartBtn"
+                  type="button"
+                  class="playback-control-btn"
+                  title="重新开始"
+                >
+                  ↻
+                </button>
+              </div>
+              <div class="playback-progress-bar">
+                <div id="playbackProgressFill" class="playback-progress-fill"></div>
               </div>
             </div>
           </div>
-          <div class="playback-sidebar">
-            <div class="playback-stats">
-              <div class="playback-stat">
-                <span class="playback-stat-label">⏱ 时间</span>
-                <span class="playback-stat-value" id="playbackTime">0s</span>
-              </div>
-              <div class="playback-stat">
-                <span class="playback-stat-label">⛏ 挖掘</span>
-                <span class="playback-stat-value" id="playbackDigs">0</span>
-              </div>
-              <div class="playback-stat">
-                <span class="playback-stat-label">🧩 完成</span>
-                <span class="playback-stat-value" id="playbackProgress">0%</span>
-              </div>
-            </div>
-            <div class="playback-timeline-container">
-              <div class="playback-timeline-header">
-                <span>📋 操作时间线</span>
-                <span id="playbackStepInfo" class="playback-step-info">0 / 0</span>
-              </div>
-              <div id="playbackTimeline" class="playback-timeline"></div>
-            </div>
-            <div class="playback-controls">
-              <button id="playbackPrevBtn" type="button" class="playback-control-btn" title="上一步">⏮</button>
-              <button id="playbackPlayBtn" type="button" class="playback-control-btn playback-play-btn" title="播放/暂停">▶</button>
-              <button id="playbackNextBtn" type="button" class="playback-control-btn" title="下一步">⏭</button>
-              <button id="playbackRestartBtn" type="button" class="playback-control-btn" title="重新开始">↻</button>
-            </div>
-            <div class="playback-progress-bar">
-              <div id="playbackProgressFill" class="playback-progress-fill"></div>
-            </div>
-          </div>
         </div>
       </div>
     </div>
-  </div>
 
-  <script src="levels.js"></script>
-  <script src="core.js"></script>
-  <script src="game-data.js"></script>
-  <script src="app.js"></script>
-</body>
+    <script src="levels.js"></script>
+    <script src="core.js"></script>
+    <script src="game-data.js"></script>
+    <script src="app.js"></script>
+  </body>
 </html>

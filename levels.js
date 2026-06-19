@@ -134,7 +134,14 @@ const artifactTemplates = {
         description: "耕土层，含近现代杂物，土质松散，小心塌方。",
         gridSize: 25,
         color: "#d4b896",
-        eventWeights: { collapse: 1.2, rain: 0.8, sun_crack: 0.6, wind: 1.0, find_coin: 1.5, ancient_guide: 0.5 },
+        eventWeights: {
+          collapse: 1.2,
+          rain: 0.8,
+          sun_crack: 0.6,
+          wind: 1.0,
+          find_coin: 1.5,
+          ancient_guide: 0.5
+        },
         buried: { 2: "p1", 6: "p2", 12: "p3" }
       },
       {
@@ -143,7 +150,14 @@ const artifactTemplates = {
         description: "汉代文化堆积，陶片与铜器残件较多，湿度较高。",
         gridSize: 25,
         color: "#b89968",
-        eventWeights: { collapse: 0.9, rain: 1.3, sun_crack: 0.7, wind: 0.8, find_coin: 1.0, ancient_guide: 1.2 },
+        eventWeights: {
+          collapse: 0.9,
+          rain: 1.3,
+          sun_crack: 0.7,
+          wind: 0.8,
+          find_coin: 1.0,
+          ancient_guide: 1.2
+        },
         buried: { 4: "p4", 9: "p5", 16: "p6" }
       },
       {
@@ -152,7 +166,14 @@ const artifactTemplates = {
         description: "原生土层，青铜镜主体埋藏于此，土质较硬，雨水易渗透。",
         gridSize: 25,
         color: "#8f7348",
-        eventWeights: { collapse: 0.7, rain: 1.5, sun_crack: 0.4, wind: 0.6, find_coin: 0.5, ancient_guide: 1.8 },
+        eventWeights: {
+          collapse: 0.7,
+          rain: 1.5,
+          sun_crack: 0.4,
+          wind: 0.6,
+          find_coin: 0.5,
+          ancient_guide: 1.8
+        },
         buried: { 1: "p7", 14: "p8", 22: "p9" }
       }
     ],

@@ -1,0 +1,58 @@
+{
+  "env": {
+    "browser": true,
+    "node": true,
+    "es2022": true
+  },
+  "extends": ["eslint:recommended", "prettier"],
+  "parserOptions": {
+    "ecmaVersion": 2022,
+    "sourceType": "script"
+  },
+  "globals": {
+    "artifactTemplates": "readonly",
+    "ARCHIVE_STORAGE_KEY": "readonly",
+    "TUTORIAL_STORAGE_KEY": "readonly",
+    "SETTINGS_STORAGE_KEY": "readonly",
+    "CUSTOM_LEVELS_STORAGE_KEY": "readonly",
+    "DAILY_CHALLENGE_STORAGE_KEY": "readonly",
+    "DAILY_PRACTICE_KEY": "readonly",
+    "RATING_ORDER": "readonly",
+    "SEEDED_RANDOM": "readonly",
+    "TIMELINE_EVENT_TYPES": "readonly",
+    "DEFAULT_LAYER_COLORS": "readonly",
+    "LAYER_HELPERS": "readonly",
+    "RESTORATION_GOALS": "readonly",
+    "getRating": "readonly",
+    "getCommentary": "readonly",
+    "getScoreColor": "readonly",
+    "evaluateGoals": "readonly",
+    "getGoalsSummary": "readonly",
+    "validateLevel": "readonly",
+    "SITE_EVENTS": "readonly",
+    "TOOLS": "readonly",
+    "TOOL_NAMES": "readonly",
+    "STYLE_PRESETS": "readonly",
+    "DEFAULT_LABELS": "readonly",
+    "calculateOverallStats": "writable",
+    "getCategoryLabel": "writable",
+    "calculateExpertScore": "writable",
+    "renderLevelCards": "writable",
+    "freshState": "writable",
+    "tryTriggerEvent": "writable",
+    "finish": "writable",
+    "init": "writable",
+    "goBack": "writable",
+    "describe": "readonly",
+    "it": "readonly",
+    "expect": "readonly"
+  },
+  "rules": {
+    "no-unused-vars": ["warn", { "argsIgnorePattern": "^_" }],
+    "no-console": "off",
+    "no-empty": ["warn", { "allowEmptyCatch": true }],
+    "no-func-assign": "warn",
+    "no-case-declarations": "warn",
+    "no-undef": "error"
+  }
+}
