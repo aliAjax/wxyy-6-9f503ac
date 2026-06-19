@@ -2508,6 +2508,7 @@ const editor = {
   bindUI() {
     document.getElementById("openEditorBtn").addEventListener("click", () => this.open());
     document.getElementById("editorBackBtn").addEventListener("click", () => this.close());
+    document.getElementById("duplicateLevelBtn").addEventListener("click", () => this.duplicate());
     document.getElementById("addPieceBtn").addEventListener("click", () => this.addPiece());
     document.getElementById("clearPiecesBtn").addEventListener("click", () => this.clearPieces());
     document.getElementById("validateBtn").addEventListener("click", () => this.validateAndShow());
@@ -2518,6 +2519,7 @@ const editor = {
       document.getElementById("importFileInput").click();
     });
     document.getElementById("importFileInput").addEventListener("change", (e) => this.importJSON(e));
+    document.getElementById("previewCopyBtn").addEventListener("click", () => this.copyFromPreview());
 
     document.getElementById("editorLevelName").addEventListener("input", (e) => {
       if (this.state) this.state.name = e.target.value;
@@ -2576,11 +2578,14 @@ const editor = {
   },
 
   open(levelId = null) {
-    this.editingLevelId = levelId;
+    this.editingLevelId = null;
     if (levelId) {
-      const level = customLevelsStore.get(levelId);
-      if (level) {
-        this.state = JSON.parse(JSON.stringify(level));
+      const customLevel = customLevelsStore.get(levelId);
+      if (customLevel) {
+        this.state = JSON.parse(JSON.stringify(customLevel));
+        this.editingLevelId = levelId;
+      } else if (artifactTemplates[levelId]) {
+        this.state = this.templateToEditorState(artifactTemplates[levelId]);
       } else {
         this.createNewState();
       }
@@ -2593,6 +2598,89 @@ const editor = {
     document.getElementById("levelSelect").classList.add("hidden");
     document.getElementById("levelEditor").classList.remove("hidden");
     document.getElementById("validationResult").innerHTML = "";
+  },
+
+  templateToEditorState(template) {
+    const iconClassMap = {
+      "bowl-icon": "bowl",
+      "tile-icon": "tile",
+      "mirror-icon": "mirror",
+      "custom-icon": "jade"
+    };
+    let stylePreset = "bowl";
+    if (template.iconClass && iconClassMap[template.iconClass]) {
+      stylePreset = iconClassMap[template.iconClass];
+    } else if (template.target && template.target.style) {
+      stylePreset = this.inferStylePreset(template);
+    }
+    return {
+      isCustom: true,
+      id: template.id,
+      name: template.name || "",
+      description: template.description || "",
+      timeLimit: template.timeLimit || 120,
+      gridSize: template.gridSize || 25,
+      pieceName: template.pieceName || "碎片",
+      snapRadius: template.snapRadius || 60,
+      stylePreset: stylePreset,
+      difficulty: template.difficulty || "自定义",
+      buried: JSON.parse(JSON.stringify(template.buried || {})),
+      pieceDefs: JSON.parse(JSON.stringify(template.pieceDefs || []))
+    };
+  },
+
+  generateCopyName(originalName) {
+    const baseName = originalName || "自定义关卡";
+    const existingLevels = customLevelsStore.getAll();
+    const existingNames = existingLevels.map((l) => l.name);
+    let copyName = `${baseName} 副本`;
+    let counter = 2;
+    while (existingNames.includes(copyName)) {
+      copyName = `${baseName} 副本 ${counter}`;
+      counter++;
+    }
+    return copyName;
+  },
+
+  duplicate() {
+    if (!this.state) {
+      alert("当前没有可复制的关卡配置");
+      return;
+    }
+    const copiedState = JSON.parse(JSON.stringify(this.state));
+    copiedState.name = this.generateCopyName(copiedState.name);
+    delete copiedState.id;
+    delete copiedState.createdAt;
+    delete copiedState.updatedAt;
+    this.state = copiedState;
+    this.editingLevelId = null;
+    this.syncUIFromState();
+    this.renderAll();
+    document.getElementById("validationResult").className = "validation-result success";
+    document.getElementById("validationResult").innerHTML =
+      `<strong>✅ 已复制为新关卡</strong> 名称已更新为「${this.state.name}」，可继续编辑后保存。`;
+  },
+
+  copyFromPreview() {
+    if (!currentPreviewTemplateId || !artifactTemplates[currentPreviewTemplateId]) {
+      alert("请先选择一个关卡");
+      return;
+    }
+    const template = artifactTemplates[currentPreviewTemplateId];
+    const editorState = this.templateToEditorState(template);
+    editorState.name = this.generateCopyName(editorState.name);
+    delete editorState.id;
+    this.state = editorState;
+    this.editingLevelId = null;
+    this.selectedPieceId = this.state.pieceDefs.length > 0 ? this.state.pieceDefs[0].id : null;
+    hideLevelPreview();
+    this.syncUIFromState();
+    this.renderAll();
+    document.getElementById("levelSelect").classList.add("hidden");
+    document.getElementById("levelEditor").classList.remove("hidden");
+    document.getElementById("validationResult").className = "validation-result success";
+    document.getElementById("validationResult").innerHTML =
+      `<strong>✅ 已复制为自定义关卡</strong> 名称：「${this.state.name}」，可编辑碎片、埋藏位置和修复槽位后保存。`;
   },
 
   close() {

@@ -1992,6 +1992,9 @@ h2 {
 
 .preview-actions {
   margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
 .preview-start-btn {
@@ -2011,6 +2014,26 @@ h2 {
   background: #4a6b62;
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(105, 137, 128, 0.3);
+}
+
+.preview-copy-btn {
+  width: 100%;
+  padding: 12px 24px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #314c53;
+  background: #fff4d9;
+  border: 2px solid #c49b62;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.preview-copy-btn:hover {
+  background: #ffe9c7;
+  border-color: #7d4c21;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(125, 76, 33, 0.2);
 }
 
 .daily-challenge-card {
@@ -2044,12 +2067,19 @@ h2 {
   margin-bottom: 20px;
   padding-bottom: 14px;
   border-bottom: 2px solid #c69a60;
+  gap: 12px;
 }
 
 .editor-header h2 {
   margin: 0;
   font-size: 22px;
   color: #314c53;
+}
+
+.editor-header-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
 }
 
 .editor-layout {
