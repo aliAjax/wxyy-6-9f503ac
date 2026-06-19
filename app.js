@@ -27,6 +27,22 @@ const tutorialOverlay = document.getElementById("tutorialOverlay");
 const tutorialSpotlight = document.getElementById("tutorialSpotlight");
 const tutorialTooltip = document.getElementById("tutorialTooltip");
 const levelListEl = document.querySelector(".level-list");
+const levelPreviewEl = document.getElementById("levelPreview");
+const previewIconEl = document.getElementById("previewIcon");
+const previewNameEl = document.getElementById("previewName");
+const previewDifficultyEl = document.getElementById("previewDifficulty");
+const previewDescriptionEl = document.getElementById("previewDescription");
+const previewPieceCountEl = document.getElementById("previewPieceCount");
+const previewTimeLimitEl = document.getElementById("previewTimeLimit");
+const previewBestScoreEl = document.getElementById("previewBestScore");
+const previewToolsEl = document.getElementById("previewTools");
+const previewStartBtn = document.getElementById("previewStartBtn");
+const closePreviewBtn = document.getElementById("closePreviewBtn");
+
+let currentPreviewTemplateId = null;
+let currentPreviewIsDaily = false;
+let currentPreviewDailyPractice = false;
+
 const hintBtn = document.getElementById("hintBtn");
 const probeBtn = document.getElementById("probeBtn");
 const brushBtn = document.getElementById("brushBtn");
@@ -765,7 +781,7 @@ function renderLevelCards() {
 
     card.appendChild(icon);
     card.appendChild(info);
-    card.addEventListener("click", () => selectLevel(template.id));
+    card.addEventListener("click", () => showLevelPreview(template.id));
     levelListEl.appendChild(card);
   });
 }
@@ -1217,6 +1233,8 @@ function init() {
   restartBtn.addEventListener("click", reset);
   hintBtn.addEventListener("click", useHint);
   backBtn.addEventListener("click", goBack);
+  closePreviewBtn.addEventListener("click", hideLevelPreview);
+  previewStartBtn.addEventListener("click", startFromPreview);
   archiveBtn.addEventListener("click", openArchive);
   closeArchiveBtn.addEventListener("click", closeArchive);
   clearArchiveBtn.addEventListener("click", openConfirmModal);
@@ -1333,6 +1351,82 @@ function selectLevel(templateId, skipAutoTutorial = false) {
   }
 }
 
+function showLevelPreview(templateId, isDaily = false, isPractice = false) {
+  const template = artifactTemplates[templateId];
+  if (!template) return;
+
+  currentPreviewTemplateId = templateId;
+  currentPreviewIsDaily = isDaily;
+  currentPreviewDailyPractice = isPractice;
+
+  previewIconEl.className = `preview-icon level-icon ${template.iconClass || "custom-icon"}`;
+
+  const bestRecords = archive.getBest();
+  const best = bestRecords.find(r => r.levelId === templateId);
+
+  previewNameEl.textContent = `${template.name}修复`;
+  previewDifficultyEl.textContent = template.difficulty || "自定义";
+  previewDescriptionEl.textContent = template.description || "探索古老文物的奥秘，将散落的碎片逐一拼合，重现历史的光辉。";
+
+  previewPieceCountEl.textContent = `${template.pieceDefs.length} 片`;
+  previewTimeLimitEl.textContent = `${template.timeLimit} 秒`;
+
+  if (best) {
+    const score = best.finalScore !== undefined ? best.finalScore : best.completeness;
+    previewBestScoreEl.textContent = `${best.rating || "-"}级 · ${score}分`;
+  } else {
+    previewBestScoreEl.textContent = "暂无记录";
+  }
+
+  previewToolsEl.innerHTML = "";
+  const toolsList = [
+    { id: "probe", ...TOOLS.probe, count: TOOLS.probe.baseCount },
+    { id: "brush", ...TOOLS.brush, count: TOOLS.brush.baseCount },
+    { id: "compass", ...TOOLS.compass, count: TOOLS.compass.baseCount }
+  ];
+  toolsList.forEach(tool => {
+    const toolEl = document.createElement("div");
+    toolEl.className = "preview-tool";
+    toolEl.innerHTML = `
+      <span class="preview-tool-icon">${tool.icon}</span>
+      <div class="preview-tool-info">
+        <span class="preview-tool-name">${tool.name}</span>
+        <span class="preview-tool-count">×${tool.count}</span>
+      </div>
+    `;
+    toolEl.title = tool.description;
+    previewToolsEl.appendChild(toolEl);
+  });
+
+  if (isDaily) {
+    previewStartBtn.textContent = isPractice ? "🔄 练习模式" : "🎮 开始挑战";
+  } else {
+    previewStartBtn.textContent = "🎮 开始修复";
+  }
+
+  levelPreviewEl.classList.remove("hidden");
+  levelPreviewEl.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function hideLevelPreview() {
+  levelPreviewEl.classList.add("hidden");
+  currentPreviewTemplateId = null;
+  currentPreviewIsDaily = false;
+  currentPreviewDailyPractice = false;
+}
+
+function startFromPreview() {
+  if (!currentPreviewTemplateId) return;
+
+  if (currentPreviewIsDaily) {
+    startDailyChallenge(currentPreviewDailyPractice);
+  } else {
+    selectLevel(currentPreviewTemplateId);
+  }
+
+  hideLevelPreview();
+}
+
 function goBack() {
   clearInterval(timer);
   if (tutorial.active) tutorial.skip();
@@ -1347,6 +1441,7 @@ function goBack() {
   levelDescriptionEl.classList.add("hidden");
   piecesEl.innerHTML = "";
   resetStatsDisplay();
+  hideLevelPreview();
 }
 
 function start() {
@@ -3123,7 +3218,7 @@ function renderCustomLevelCards() {
     card.appendChild(info);
     card.addEventListener("click", () => {
       artifactTemplates[level.id] = level;
-      selectLevel(level.id);
+      showLevelPreview(level.id);
     });
 
     const actions = document.createElement("div");
@@ -3652,6 +3747,7 @@ finish = function(success, message) {
 function renderDailyChallengeCard() {
   const dateStr = getDateString();
   const challenge = getTodayChallenge();
+  artifactTemplates[challenge.id] = challenge;
   const hasCompleted = dailyChallengeStore.hasCompleted(dateStr);
   const record = dailyChallengeStore.getRecord(dateStr);
   const streak = dailyChallengeStore.getStreak();
@@ -3705,14 +3801,25 @@ function renderDailyChallengeCard() {
 
   const startBtn = document.getElementById("startDailyBtn");
   if (startBtn) {
-    startBtn.addEventListener("click", () => {
-      startDailyChallenge(hasCompleted);
+    startBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      showLevelPreview(challenge.id, true, hasCompleted);
+    });
+  }
+
+  const dailyCard = dailySection.querySelector(".daily-challenge-card");
+  if (dailyCard) {
+    dailyCard.addEventListener("click", () => {
+      showLevelPreview(challenge.id, true, hasCompleted);
     });
   }
 
   const calendarBtn = document.getElementById("viewCalendarBtn");
   if (calendarBtn) {
-    calendarBtn.addEventListener("click", openCalendarModal);
+    calendarBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      openCalendarModal();
+    });
   }
 }
 

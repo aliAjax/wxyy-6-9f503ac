@@ -31,6 +31,47 @@
           <button id="openEditorBtn" type="button" class="editor-entry-btn">🛠️ 关卡编辑器</button>
         </div>
       </div>
+
+      <div id="levelPreview" class="level-preview hidden">
+        <button id="closePreviewBtn" type="button" class="close-preview-btn" aria-label="关闭预览">&times;</button>
+        <div class="preview-content">
+          <div class="preview-left">
+            <div id="previewIcon" class="preview-icon level-icon"></div>
+            <div class="preview-basic">
+              <h3 id="previewName" class="preview-name"></h3>
+              <span id="previewDifficulty" class="preview-difficulty"></span>
+            </div>
+          </div>
+          <div class="preview-right">
+            <div class="preview-section">
+              <h4 class="preview-section-title">器物说明</h4>
+              <p id="previewDescription" class="preview-description"></p>
+            </div>
+            <div class="preview-stats">
+              <div class="preview-stat">
+                <span class="preview-stat-label">碎片数量</span>
+                <strong id="previewPieceCount" class="preview-stat-value"></strong>
+              </div>
+              <div class="preview-stat">
+                <span class="preview-stat-label">倒计时</span>
+                <strong id="previewTimeLimit" class="preview-stat-value"></strong>
+              </div>
+              <div class="preview-stat">
+                <span class="preview-stat-label">最佳成绩</span>
+                <strong id="previewBestScore" class="preview-stat-value"></strong>
+              </div>
+            </div>
+            <div class="preview-section">
+              <h4 class="preview-section-title">可用工具</h4>
+              <div id="previewTools" class="preview-tools"></div>
+            </div>
+            <div class="preview-actions">
+              <button id="previewStartBtn" type="button" class="preview-start-btn">🎮 开始修复</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div id="presetLevels" class="level-list-section">
         <h3 class="section-subtitle">官方关卡</h3>
         <div class="level-list">
