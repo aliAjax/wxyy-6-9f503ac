@@ -2227,10 +2227,12 @@ function spawnPiece(id) {
   const piece = document.createElement("div");
   piece.className = "piece";
   piece.dataset.id = id;
+  piece.dataset.label = def.label;
   piece.dataset.angle = String(def.initialAngle);
+  piece.style.setProperty("--piece-rotation", `${def.initialAngle}deg`);
   piece.tabIndex = 0;
   piece.setAttribute("role", "button");
-  piece.setAttribute("aria-label", `${def.label}${template.pieceName}，按方向键移动，R键旋转，空格键尝试贴合`);
+  piece.setAttribute("aria-label", `${def.label}${template.pieceName}，角度${def.initialAngle}度，按方向键移动，R键旋转，空格键尝试贴合`);
   piece.setAttribute("aria-grabbed", "false");
   piece.style.width = `${style.width}px`;
   piece.style.height = `${style.height}px`;
@@ -2356,7 +2358,9 @@ function movePieceWithKeyboard(piece, direction) {
 
   piece.style.left = `${left}px`;
   piece.style.top = `${top}px`;
+  selectPiece(piece);
   updateSnapFeedback(piece);
+  piece.setAttribute("aria-label", `${piece.dataset.label || '碎片'}，位置(${Math.round(left)}, ${Math.round(top)})，角度${piece.dataset.angle}度，按方向键移动，R键旋转，空格键尝试贴合`);
 }
 
 function moveGridFocus(direction) {
@@ -2403,6 +2407,8 @@ function focusNextPiece(forward = true) {
   keyboardNav.focusedPieceIndex = newIndex;
   if (pieces[newIndex]) {
     pieces[newIndex].focus();
+    selectPiece(pieces[newIndex]);
+    updateSnapFeedback(pieces[newIndex]);
   }
 }
 
@@ -2535,9 +2541,9 @@ function rotatePiece(piece) {
   piece.dataset.angle = String((Number(piece.dataset.angle) + 45) % 360);
   applyRotation(piece);
   tutorial.notifyAction("rotate");
-  if (dragging && dragging.piece === piece) {
-    updateSnapFeedback(piece);
-  }
+  selectPiece(piece);
+  updateSnapFeedback(piece);
+  piece.setAttribute("aria-label", `${piece.dataset.label || '碎片'}，当前角度${piece.dataset.angle}度，按方向键移动，R键旋转，空格键尝试贴合`);
 }
 
 function selectPiece(piece) {
@@ -2790,6 +2796,7 @@ function handleOrientationChange() {
 }
 
 function applyRotation(piece) {
+  piece.style.setProperty("--piece-rotation", `${piece.dataset.angle}deg`);
   piece.style.transform = `rotate(${piece.dataset.angle}deg)`;
 }
 
@@ -2806,6 +2813,7 @@ function trySnap(piece) {
   const distance = Math.hypot(centerX - targetX, centerY - targetY);
   const angleOk = Number(piece.dataset.angle) === def.angle;
   const snapRadius = template.snapRadius;
+
   if (distance < snapRadius && angleOk) {
     const benchRect = piecesEl.getBoundingClientRect();
     const targetRelativeX = targetRect.left - benchRect.left + targetRect.width * def.slot.x / 100;
@@ -2814,12 +2822,18 @@ function trySnap(piece) {
     piece.classList.add("snapping");
     piece.style.left = `${targetRelativeX}px`;
     piece.style.top = `${targetRelativeY}px`;
+    piece.setAttribute("aria-live", "polite");
+    piece.setAttribute("aria-label", `${def.label}贴合成功`);
 
     setTimeout(() => {
       piece.classList.remove("snapping");
       piece.classList.add("locked");
       piece.classList.remove("selected");
+      piece.classList.remove("near-slot");
       piece.style.background = template.piece.style.lockedBackground;
+      piece.tabIndex = -1;
+      piece.setAttribute("aria-disabled", "true");
+      piece.setAttribute("aria-label", `${def.label}已锁定`);
       state.locked.add(id);
       addLog(`${def.label}${template.pieceName}贴合成功。`);
       triggerVibration([10, 30, 10]);
@@ -2827,15 +2841,48 @@ function trySnap(piece) {
       if (selectedPiece === piece) {
         selectedPiece = null;
       }
+      clearSnapFeedback();
+      renderStats();
+
       if (state.locked.size === template.pieceDefs.length) {
         finish(true, `${template.name}修复完成。`);
+      } else {
+        const pieces = keyboardNav.getUnlockedPieces();
+        if (pieces.length > 0) {
+          keyboardNav.focusedPieceIndex = keyboardNav.focusedPieceIndex % pieces.length;
+          const nextPiece = pieces[keyboardNav.focusedPieceIndex];
+          if (nextPiece) {
+            nextPiece.focus();
+            selectPiece(nextPiece);
+          }
+        }
       }
     }, 150);
   } else if (distance < snapRadius && !angleOk) {
     state.wrongAngleAttempts += 1;
-    addLog("角度不对，双击碎片可以旋转。");
+    addLog("角度不对，按R键可以旋转碎片。");
+    piece.classList.add("shake");
+    piece.setAttribute("aria-live", "assertive");
+    piece.setAttribute("aria-label", `${def.label}角度不对，当前${piece.dataset.angle}度，目标${def.angle}度`);
+    setTimeout(() => piece.classList.remove("shake"), 400);
+    clearSnapFeedback();
+    updateSnapFeedback(piece);
   } else if (!angleOk) {
-    addLog("角度不对，双击碎片可以旋转。");
+    addLog("位置不对，请移到目标轮廓附近再尝试贴合。角度不对，按R键可以旋转碎片。");
+    piece.classList.add("shake");
+    piece.setAttribute("aria-live", "assertive");
+    piece.setAttribute("aria-label", `${def.label}位置不对且角度不对，当前${piece.dataset.angle}度，目标${def.angle}度`);
+    setTimeout(() => piece.classList.remove("shake"), 400);
+    clearSnapFeedback();
+    updateSnapFeedback(piece);
+  } else {
+    addLog("位置不对，请移到目标轮廓附近再尝试贴合。");
+    piece.classList.add("shake");
+    piece.setAttribute("aria-live", "assertive");
+    piece.setAttribute("aria-label", `${def.label}位置不对，请移到目标轮廓附近`);
+    setTimeout(() => piece.classList.remove("shake"), 400);
+    clearSnapFeedback();
+    updateSnapFeedback(piece);
   }
   clearSnapFeedback();
   renderStats();
