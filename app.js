@@ -85,11 +85,11 @@ const keyboardNav = {
   rotateStep: 45,
   getGridCols() {
     const template = artifactTemplates[currentTemplate];
-    return Math.sqrt(template.gridSize || 25);
+    return Math.sqrt(LAYER_HELPERS.getLayerGridSize(template, state.currentLayerId));
   },
   getGridSize() {
     const template = artifactTemplates[currentTemplate];
-    return template.gridSize || 25;
+    return LAYER_HELPERS.getLayerGridSize(template, state.currentLayerId);
   },
   getUnlockedPieces() {
     return Array.from(document.querySelectorAll(".piece:not(.locked)"));
@@ -100,6 +100,112 @@ const ARCHIVE_STORAGE_KEY = "archaeology_archive_records";
 const TUTORIAL_STORAGE_KEY = "archaeology_tutorial_done";
 const SETTINGS_STORAGE_KEY = "archaeology_game_settings";
 const RATING_ORDER = { S: 5, A: 4, B: 3, C: 2, D: 1, F: 0 };
+
+const DEFAULT_LAYER_COLORS = [
+  "#d4b896",
+  "#b89968",
+  "#9c7856",
+  "#80603f",
+  "#6b4e35",
+  "#5a402c"
+];
+
+const LAYER_HELPERS = {
+  ensureLayers(template) {
+    if (template.layers && Array.isArray(template.layers) && template.layers.length > 0) {
+      return template;
+    }
+    const layer = {
+      id: "layer_0",
+      name: "文化层",
+      description: "单一文化层",
+      gridSize: template.gridSize || 25,
+      color: DEFAULT_LAYER_COLORS[0],
+      buried: JSON.parse(JSON.stringify(template.buried || {})),
+      eventWeights: {}
+    };
+    if (template.pieceDefs) {
+      template.pieceDefs.forEach(p => {
+        p.layerId = "layer_0";
+      });
+    }
+    template.layers = [layer];
+    template.currentLayerId = "layer_0";
+    return template;
+  },
+
+  getLayers(template) {
+    this.ensureLayers(template);
+    return template.layers;
+  },
+
+  getLayer(template, layerId) {
+    const layers = this.getLayers(template);
+    return layers.find(l => l.id === layerId) || layers[0];
+  },
+
+  getLayerIndex(template, layerId) {
+    const layers = this.getLayers(template);
+    return layers.findIndex(l => l.id === layerId);
+  },
+
+  getCurrentLayer(template, currentLayerId) {
+    return this.getLayer(template, currentLayerId || template.currentLayerId);
+  },
+
+  getLayerBuried(template, layerId) {
+    const layer = this.getLayer(template, layerId);
+    return layer.buried || {};
+  },
+
+  getLayerGridSize(template, layerId) {
+    const layer = this.getLayer(template, layerId);
+    return layer.gridSize || template.gridSize || 25;
+  },
+
+  getLayerPieces(template, layerId) {
+    const pieces = template.pieceDefs || [];
+    if (!layerId) return pieces;
+    return pieces.filter(p => p.layerId === layerId);
+  },
+
+  isLayerCleared(template, layerId, dugSet) {
+    const buried = this.getLayerBuried(template, layerId);
+    const pieceIndices = Object.keys(buried).map(Number);
+    return pieceIndices.every(idx => dugSet.has(idx));
+  },
+
+  isLayerAccessible(template, layerId, layerDugMap) {
+    const layers = this.getLayers(template);
+    const idx = layers.findIndex(l => l.id === layerId);
+    if (idx <= 0) return true;
+    const prevLayer = layers[idx - 1];
+    return this.isLayerCleared(template, prevLayer.id, layerDugMap.get(prevLayer.id) || new Set());
+  },
+
+  getEventProbability(template, layerId, eventId, baseProbability) {
+    const layer = this.getLayer(template, layerId);
+    if (layer.eventWeights && layer.eventWeights[eventId] !== undefined) {
+      const weight = layer.eventWeights[eventId];
+      return Math.max(0, Math.min(1, baseProbability * weight));
+    }
+    return baseProbability;
+  },
+
+  isPieceAccessible(template, pieceDef, layerDugMap) {
+    if (!pieceDef.layerId) return true;
+    return this.isLayerAccessible(template, pieceDef.layerId, layerDugMap);
+  },
+
+  mergeBuriedFromLayers(template) {
+    const layers = this.getLayers(template);
+    const merged = {};
+    layers.forEach(layer => {
+      Object.assign(merged, layer.buried || {});
+    });
+    return merged;
+  }
+};
 
 const SEEDED_RANDOM = {
   _seed: 1,
@@ -1162,16 +1268,57 @@ const TOOLS = {
     canUse(state, template) {
       if (!state.running) return { ok: false, reason: "游戏未开始" };
       if (state.tools.probe <= 0) return { ok: false, reason: "探针已用完" };
-      const pieceIndices = Object.keys(template.buried).map(Number);
+      const currentLayerId = state.currentLayerId;
+      const buried = LAYER_HELPERS.getLayerBuried(template, currentLayerId);
+      const pieceIndices = Object.keys(buried).map(Number);
       const hidden = pieceIndices.filter(i => !state.dug.has(i) && !state.probeHints.has(i));
-      if (hidden.length === 0) return { ok: false, reason: "没有可探测的碎片" };
+      if (hidden.length === 0) {
+        const layers = LAYER_HELPERS.getLayers(template);
+        let hasHidden = false;
+        for (const layer of layers) {
+          if (!LAYER_HELPERS.isLayerAccessible(template, layer.id, state.layerDug)) break;
+          const lBuried = LAYER_HELPERS.getLayerBuried(template, layer.id);
+          const lDug = state.layerDug.get(layer.id) || new Set();
+          const lProbe = state.layerProbeHints.get(layer.id) || new Set();
+          const lHidden = Object.keys(lBuried).map(Number).filter(i => !lDug.has(i) && !lProbe.has(i));
+          if (lHidden.length > 0) { hasHidden = true; break; }
+        }
+        if (!hasHidden) return { ok: false, reason: "没有可探测的碎片" };
+        return { ok: true, _needSwitchLayer: true };
+      }
       return { ok: true };
     },
     use(state, template) {
-      const pieceIndices = Object.keys(template.buried).map(Number);
-      const hidden = pieceIndices.filter(i => !state.dug.has(i) && !state.probeHints.has(i));
+      let currentLayerId = state.currentLayerId;
+      let buried = LAYER_HELPERS.getLayerBuried(template, currentLayerId);
+      let pieceIndices = Object.keys(buried).map(Number);
+      let hidden = pieceIndices.filter(i => !state.dug.has(i) && !state.probeHints.has(i));
+
+      if (hidden.length === 0) {
+        const layers = LAYER_HELPERS.getLayers(template);
+        for (const layer of layers) {
+          if (!LAYER_HELPERS.isLayerAccessible(template, layer.id, state.layerDug)) break;
+          const lBuried = LAYER_HELPERS.getLayerBuried(template, layer.id);
+          const lDug = state.layerDug.get(layer.id) || new Set();
+          const lProbe = state.layerProbeHints.get(layer.id) || new Set();
+          const lHidden = Object.keys(lBuried).map(Number).filter(i => !lDug.has(i) && !lProbe.has(i));
+          if (lHidden.length > 0) {
+            currentLayerId = layer.id;
+            buried = lBuried;
+            pieceIndices = Object.keys(buried).map(Number);
+            hidden = lHidden;
+            state.currentLayerId = currentLayerId;
+            state.dug = state.layerDug.get(currentLayerId);
+            state.lockedCells = state.layerLockedCells.get(currentLayerId);
+            state.hintedCells = state.layerHintedCells.get(currentLayerId);
+            state.probeHints = state.layerProbeHints.get(currentLayerId);
+            break;
+          }
+        }
+      }
+
       const targetIdx = hidden[SEEDED_RANDOM.int(0, hidden.length - 1)];
-      const cols = Math.sqrt(template.gridSize || 25);
+      const cols = Math.sqrt(LAYER_HELPERS.getLayerGridSize(template, currentLayerId));
       const row = Math.floor(targetIdx / cols);
       const col = targetIdx % cols;
       const areaCells = [];
@@ -1190,10 +1337,11 @@ const TOOLS = {
       }
       state.tools.probe -= 1;
       state.toolsUsed.probe += 1;
-      const def = template.pieceDefs.find(p => p.id === template.buried[targetIdx]);
+      const def = template.pieceDefs.find(p => p.id === buried[targetIdx]);
+      const layerName = LAYER_HELPERS.getLayer(template, currentLayerId).name;
       return {
         success: true,
-        message: `探针探测：${def ? def.label : "某件"}${template.pieceName}位于第${row + 1}行第${col + 1}列附近区域，已高亮 ${areaCells.length} 格。`,
+        message: `探针探测（${layerName}）：${def ? def.label : "某件"}${template.pieceName}位于第${row + 1}行第${col + 1}列附近区域，已高亮 ${areaCells.length} 格。`,
         cells: areaCells
       };
     }
@@ -1208,11 +1356,12 @@ const TOOLS = {
     canUse(state, template) {
       if (!state.running) return { ok: false, reason: "游戏未开始" };
       if (state.tools.brush <= 0) return { ok: false, reason: "刷子已用完" };
+      const gridSize = LAYER_HELPERS.getLayerGridSize(template, state.currentLayerId);
       const undug = [];
-      for (let i = 0; i < (template.gridSize || 25); i++) {
+      for (let i = 0; i < gridSize; i++) {
         if (!state.dug.has(i) && !state.lockedCells.has(i)) undug.push(i);
       }
-      if (undug.length === 0) return { ok: false, reason: "没有可清理的格子" };
+      if (undug.length === 0) return { ok: false, reason: "当前层没有可清理的格子" };
       return { ok: true };
     },
     use(state, template) {
@@ -1260,11 +1409,12 @@ const TOOLS = {
     canUse(state, template) {
       if (!state.running) return { ok: false, reason: "游戏未开始" };
       if (state.tools.trowel <= 0) return { ok: false, reason: "小手铲已用完" };
+      const gridSize = LAYER_HELPERS.getLayerGridSize(template, state.currentLayerId);
       const undug = [];
-      for (let i = 0; i < (template.gridSize || 25); i++) {
+      for (let i = 0; i < gridSize; i++) {
         if (!state.dug.has(i) && !state.lockedCells.has(i)) undug.push(i);
       }
-      if (undug.length === 0) return { ok: false, reason: "没有可挖掘的格子" };
+      if (undug.length === 0) return { ok: false, reason: "当前层没有可挖掘的格子" };
       return { ok: true };
     },
     use(state, template) {
@@ -1498,11 +1648,40 @@ const artifactTemplates = {
     id: "mirror",
     name: "青铜镜",
     pieceName: "铜镜残片",
-    timeLimit: 180,
+    timeLimit: 240,
     difficulty: "高级",
     snapRadius: 50,
     gridSize: 25,
     iconClass: "mirror-icon",
+    layers: [
+      {
+        id: "layer1",
+        name: "表土层",
+        description: "耕土层，含近现代杂物，土质松散，小心塌方。",
+        gridSize: 25,
+        color: "#d4b896",
+        eventWeights: { collapse: 1.2, rain: 0.8, sun_crack: 0.6, wind: 1.0, find_coin: 1.5, ancient_guide: 0.5 },
+        buried: { 2: "p1", 6: "p2", 12: "p3" }
+      },
+      {
+        id: "layer2",
+        name: "文化层",
+        description: "汉代文化堆积，陶片与铜器残件较多，湿度较高。",
+        gridSize: 25,
+        color: "#b89968",
+        eventWeights: { collapse: 0.9, rain: 1.3, sun_crack: 0.7, wind: 0.8, find_coin: 1.0, ancient_guide: 1.2 },
+        buried: { 4: "p4", 9: "p5", 16: "p6" }
+      },
+      {
+        id: "layer3",
+        name: "生土层",
+        description: "原生土层，青铜镜主体埋藏于此，土质较硬，雨水易渗透。",
+        gridSize: 25,
+        color: "#8f7348",
+        eventWeights: { collapse: 0.7, rain: 1.5, sun_crack: 0.4, wind: 0.6, find_coin: 0.5, ancient_guide: 1.8 },
+        buried: { 1: "p7", 14: "p8", 22: "p9" }
+      }
+    ],
     target: {
       shape: "mirror",
       style: {
@@ -1536,17 +1715,6 @@ const artifactTemplates = {
         innerDecorationRadius: "50%"
       }
     },
-    buried: {
-      0: "p1",
-      4: "p2",
-      6: "p3",
-      10: "p4",
-      14: "p5",
-      16: "p6",
-      18: "p7",
-      20: "p8",
-      24: "p9"
-    },
     pieceDefs: [
       { id: "p1", label: "顶", slot: { x: 33, y: 3 }, angle: 0, initialAngle: 135 },
       { id: "p2", label: "右上", slot: { x: 60, y: 15 }, angle: 45, initialAngle: 225 },
@@ -1558,10 +1726,10 @@ const artifactTemplates = {
       { id: "p8", label: "左上", slot: { x: 8, y: 15 }, angle: 315, initialAngle: 270 },
       { id: "p9", label: "中心", slot: { x: 33, y: 38 }, angle: 0, initialAngle: 180 }
     ],
-    toolPoints: 15,
+    toolPoints: 20,
     goals: {
-      maxDigs: 25,
-      timeLimit: 150,
+      maxDigs: 35,
+      timeLimit: 200,
       noTools: true,
       avoidNegativeKeyEvents: true
     }
@@ -2268,6 +2436,10 @@ function renderLevelCards() {
 
 function freshState() {
   const template = artifactTemplates[currentTemplate];
+  LAYER_HELPERS.ensureLayers(template);
+  const layers = template.layers;
+  const firstLayerId = layers[0].id;
+
   let toolkit = null;
   if (selectedToolkit) {
     toolkit = selectedToolkit;
@@ -2288,17 +2460,36 @@ function freshState() {
   const toolsUsedInit = { probe: 0, brush: 0, compass: 0, trowel: 0 };
   const randomSeed = SEEDED_RANDOM.init();
   timelineRecorder.start(randomSeed);
+
+  const layerDug = new Map();
+  const layerLockedCells = new Map();
+  const layerHintedCells = new Map();
+  const layerProbeHints = new Map();
+
+  layers.forEach(layer => {
+    layerDug.set(layer.id, new Set());
+    layerLockedCells.set(layer.id, new Set());
+    layerHintedCells.set(layer.id, new Set());
+    layerProbeHints.set(layer.id, new Set());
+  });
+
   return {
     running: false,
     timeLeft: template.timeLimit,
     elapsedTime: 0,
     digs: 0,
-    dug: new Set(),
+    currentLayerId: firstLayerId,
+    layerDug: layerDug,
+    layerLockedCells: layerLockedCells,
+    layerHintedCells: layerHintedCells,
+    layerProbeHints: layerProbeHints,
+    layerRecords: {},
+    dug: layerDug.get(firstLayerId),
     found: new Set(),
     locked: new Set(),
-    log: [`探方已经布好，先从泥土里找${template.pieceName}。`],
-    lockedCells: new Set(),
-    hintedCells: new Set(),
+    log: [`探方已经布好，先从${layers[0].name}里找${template.pieceName}。`],
+    lockedCells: layerLockedCells.get(firstLayerId),
+    hintedCells: layerHintedCells.get(firstLayerId),
     toolWear: 0,
     bonusScore: 0,
     triggeredEvents: [],
@@ -2308,7 +2499,7 @@ function freshState() {
     hintsUsed: 0,
     tools: toolsInit,
     toolsUsed: toolsUsedInit,
-    probeHints: new Set(),
+    probeHints: layerProbeHints.get(firstLayerId),
     activeTool: null,
     compassActive: false,
     toolPackage: { ...toolsInit },
@@ -2404,6 +2595,7 @@ function renderTarget() {
 
 function tryTriggerEvent() {
   const template = artifactTemplates[currentTemplate];
+  const currentLayerId = state.currentLayerId;
   const events = Object.values(SITE_EVENTS);
   const availableEvents = events.filter((evt) => {
     const cooldown = state.eventCooldowns[evt.id] || 0;
@@ -2411,7 +2603,8 @@ function tryTriggerEvent() {
   });
 
   for (const evt of availableEvents) {
-    if (SEEDED_RANDOM.next() < evt.probability) {
+    const adjustedProb = LAYER_HELPERS.getEventProbability(template, currentLayerId, evt.id, evt.probability);
+    if (SEEDED_RANDOM.next() < adjustedProb) {
       const before = {
         lockedCells: new Set(state.lockedCells),
         hintedCells: new Set(state.hintedCells),
@@ -2477,6 +2670,62 @@ function tryTriggerEvent() {
   return null;
 }
 
+function calculateLayerAccuracy(template) {
+  const layers = LAYER_HELPERS.getLayers(template);
+  const layerResults = [];
+  let totalCorrectPieces = 0;
+  let totalExpectedPieces = 0;
+  let weightedLayerScore = 0;
+  let totalWeight = 0;
+
+  layers.forEach((layer, idx) => {
+    const buried = LAYER_HELPERS.getLayerBuried(template, layer.id);
+    const expectedPieces = Object.keys(buried).length;
+    const record = state.layerRecords[layer.id] || { correctDigs: 0, totalDigs: 0, pieces: [] };
+    const foundInLayer = record.pieces.length;
+    const correctInLayer = Math.min(foundInLayer, expectedPieces);
+    const accuracy = expectedPieces > 0
+      ? Math.round((correctInLayer / expectedPieces) * 100)
+      : 100;
+    const digEfficiency = record.totalDigs > 0
+      ? Math.round(Math.max(0, 100 - Math.max(0, record.totalDigs - expectedPieces) * 15))
+      : 100;
+    const layerScore = Math.round((accuracy + digEfficiency) / 2);
+    const weight = idx + 1;
+
+    totalCorrectPieces += correctInLayer;
+    totalExpectedPieces += expectedPieces;
+    weightedLayerScore += layerScore * weight;
+    totalWeight += weight;
+
+    layerResults.push({
+      layerId: layer.id,
+      layerName: layer.name,
+      layerColor: layer.color || DEFAULT_LAYER_COLORS[idx],
+      expectedPieces,
+      foundPieces: foundInLayer,
+      totalDigs: record.totalDigs,
+      accuracy,
+      digEfficiency,
+      layerScore
+    });
+  });
+
+  const overallLayerAccuracy = totalExpectedPieces > 0
+    ? Math.round((totalCorrectPieces / totalExpectedPieces) * 100)
+    : 100;
+  const weightedAvgLayerScore = totalWeight > 0
+    ? Math.round(weightedLayerScore / totalWeight)
+    : 100;
+
+  return {
+    layerResults,
+    overallLayerAccuracy,
+    weightedAvgLayerScore,
+    isMultiLayer: layers.length > 1
+  };
+}
+
 function calculateExpertScore(template) {
   const pieceCount = template.pieceDefs.length;
   const timeRatio = state.timeLeft / template.timeLimit;
@@ -2489,8 +2738,17 @@ function calculateExpertScore(template) {
   const hintScore = state.hintsUsed === 0 ? 100 : Math.round(Math.max(0, 100 - state.hintsUsed * 30));
   const toolPenalty = (state.toolsUsed.probe * 15) + (state.toolsUsed.brush * 10) + (state.toolsUsed.compass * 20) + ((state.toolsUsed.trowel || 0) * 12);
   const toolScore = Math.round(Math.max(0, 100 - toolPenalty));
-  const totalScore = Math.round((timeScore + digScore + angleScore + eventScore + hintScore + toolScore) / 6);
-  return { timeScore, digScore, angleScore, eventScore, hintScore, toolScore, totalScore };
+
+  const layerAccuracy = calculateLayerAccuracy(template);
+  const layerScore = layerAccuracy.weightedAvgLayerScore;
+
+  let totalScore;
+  if (layerAccuracy.isMultiLayer) {
+    totalScore = Math.round((timeScore + digScore + angleScore + eventScore + hintScore + toolScore + layerScore) / 7);
+  } else {
+    totalScore = Math.round((timeScore + digScore + angleScore + eventScore + hintScore + toolScore) / 6);
+  }
+  return { timeScore, digScore, angleScore, eventScore, hintScore, toolScore, layerScore, layerAccuracy, totalScore };
 }
 
 function getRating(score) {
@@ -3204,6 +3462,34 @@ function showLevelPreview(templateId, isDaily = false, isPractice = false) {
     previewGoalsSection.classList.add("hidden");
   }
 
+  const previewLayersSection = document.getElementById("previewLayersSection");
+  const previewLayersEl = document.getElementById("previewLayers");
+  if (previewLayersSection && previewLayersEl) {
+    previewLayersEl.innerHTML = "";
+    const layers = LAYER_HELPERS.getLayers(template);
+    if (layers.length > 1) {
+      previewLayersSection.classList.remove("hidden");
+      layers.forEach((layer, idx) => {
+        const layerBuried = LAYER_HELPERS.getLayerBuried(template, layer.id);
+        const pieceCount = Object.keys(layerBuried).length;
+        const gridSize = LAYER_HELPERS.getLayerGridSize(template, layer.id);
+        const layerEl = document.createElement("div");
+        layerEl.className = "preview-layer-item";
+        layerEl.innerHTML = `
+          <div class="preview-layer-color" style="background:${layer.color || DEFAULT_LAYER_COLORS[idx % DEFAULT_LAYER_COLORS.length]}"></div>
+          <div class="preview-layer-info">
+            <div class="preview-layer-name">第${idx + 1}层 · ${layer.name}</div>
+            <div class="preview-layer-desc">${layer.description || ""}</div>
+            <div class="preview-layer-stats">${gridSize}×${gridSize}探方 · ${pieceCount}片埋藏</div>
+          </div>
+        `;
+        previewLayersEl.appendChild(layerEl);
+      });
+    } else {
+      previewLayersSection.classList.add("hidden");
+    }
+  }
+
   const toggleModeBtn = document.getElementById("previewToggleModeBtn");
   if (toggleModeBtn) {
     if (isDaily) {
@@ -3305,6 +3591,100 @@ function reset() {
   render();
 }
 
+function switchLayer(layerId) {
+  const template = artifactTemplates[currentTemplate];
+  const layers = LAYER_HELPERS.getLayers(template);
+  const targetLayer = layers.find(l => l.id === layerId);
+  if (!targetLayer) return;
+
+  if (!LAYER_HELPERS.isLayerAccessible(template, layerId, state.layerDug)) {
+    const idx = layers.findIndex(l => l.id === layerId);
+    const prevLayer = layers[idx - 1];
+    addLog(`无法进入「${targetLayer.name}」，需要先清理完「${prevLayer.name}」的所有碎片。`);
+    return;
+  }
+
+  state.currentLayerId = layerId;
+  state.dug = state.layerDug.get(layerId);
+  state.lockedCells = state.layerLockedCells.get(layerId);
+  state.hintedCells = state.layerHintedCells.get(layerId);
+  state.probeHints = state.layerProbeHints.get(layerId);
+  keyboardNav.focusedCellIndex = 0;
+
+  addLog(`切换到「${targetLayer.name}」。${targetLayer.description ? `（${targetLayer.description}）` : ""}`);
+  cancelToolMode(false);
+  render();
+}
+
+function checkLayerClearAndUnlock(layerId) {
+  const template = artifactTemplates[currentTemplate];
+  const layers = LAYER_HELPERS.getLayers(template);
+  const dugSet = state.layerDug.get(layerId);
+  if (!LAYER_HELPERS.isLayerCleared(template, layerId, dugSet)) return false;
+
+  const idx = layers.findIndex(l => l.id === layerId);
+  if (idx >= 0 && idx < layers.length - 1) {
+    const clearedLayer = layers[idx];
+    const nextLayer = layers[idx + 1];
+    addLog(`🎉「${clearedLayer.name}」清理完毕！可以进入「${nextLayer.name}」继续发掘。`);
+    return true;
+  }
+  return false;
+}
+
+function renderLayerTabs() {
+  const template = artifactTemplates[currentTemplate];
+  const layers = LAYER_HELPERS.getLayers(template);
+  const layerPanel = document.getElementById("layerPanel");
+  const layerTabsEl = document.getElementById("layerTabs");
+  const layerInfoEl = document.getElementById("layerInfo");
+
+  if (layers.length <= 1) {
+    layerPanel.classList.add("hidden");
+    return;
+  }
+
+  layerPanel.classList.remove("hidden");
+  layerTabsEl.innerHTML = "";
+
+  layers.forEach((layer, idx) => {
+    const tab = document.createElement("button");
+    tab.type = "button";
+    tab.className = "layer-tab";
+    tab.role = "tab";
+    tab.dataset.layerId = layer.id;
+
+    const isAccessible = LAYER_HELPERS.isLayerAccessible(template, layer.id, state.layerDug);
+    const isCleared = LAYER_HELPERS.isLayerCleared(template, layer.id, state.layerDug.get(layer.id));
+    const isActive = state.currentLayerId === layer.id;
+
+    if (isActive) tab.classList.add("active");
+    if (!isAccessible) tab.classList.add("locked-layer");
+    if (isCleared) tab.classList.add("cleared-layer");
+
+    tab.innerHTML = `
+      <span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:${layer.color || '#d4b896'};border:1px solid #5c3a1a;"></span>
+      <span>${idx + 1}. ${layer.name}</span>
+      ${!isAccessible ? '🔒' : ''}
+    `;
+
+    tab.addEventListener("click", () => switchLayer(layer.id));
+    layerTabsEl.appendChild(tab);
+  });
+
+  const currentLayer = LAYER_HELPERS.getCurrentLayer(template, state.currentLayerId);
+  const buried = LAYER_HELPERS.getLayerBuried(template, state.currentLayerId);
+  const pieceCount = Object.keys(buried).length;
+  const foundInLayer = Object.keys(buried).filter(k => state.found.has(buried[k])).length;
+  layerInfoEl.innerHTML = `
+    <span class="layer-name">${currentLayer.name}</span>
+    ${currentLayer.description ? `<div>${currentLayer.description}</div>` : ""}
+    <div style="margin-top:4px;font-size:12px;color:#7d4c21;">
+      本层碎片：${foundInLayer} / ${pieceCount} · 探方尺寸：${Math.sqrt(LAYER_HELPERS.getLayerGridSize(template, state.currentLayerId))}×${Math.sqrt(LAYER_HELPERS.getLayerGridSize(template, state.currentLayerId))}
+    </div>
+  `;
+}
+
 function dig(index) {
   if (!state.running || state.dug.has(index) || state.lockedCells.has(index)) return;
 
@@ -3318,16 +3698,28 @@ function dig(index) {
   }
 
   const template = artifactTemplates[currentTemplate];
+  const currentLayerId = state.currentLayerId;
+  const buried = LAYER_HELPERS.getLayerBuried(template, currentLayerId);
   state.dug.add(index);
   state.digs += 1;
-  if (template.buried[index]) {
-    const id = template.buried[index];
+
+  if (!state.layerRecords[currentLayerId]) {
+    state.layerRecords[currentLayerId] = { correctDigs: 0, totalDigs: 0, pieces: [] };
+  }
+  state.layerRecords[currentLayerId].totalDigs += 1;
+
+  if (buried[index]) {
+    const id = buried[index];
     state.found.add(id);
-    addLog(`挖到了${template.pieceDefs.find((p) => p.id === id).label}${template.pieceName}。`);
+    state.layerRecords[currentLayerId].correctDigs += 1;
+    state.layerRecords[currentLayerId].pieces.push(id);
+    const pieceDef = template.pieceDefs.find((p) => p.id === id);
+    addLog(`挖到了${pieceDef ? pieceDef.label : id}${template.pieceName}（出自${LAYER_HELPERS.getCurrentLayer(template, currentLayerId).name}）。`);
     timelineRecorder.recordDig(index, id, "normal");
     spawnPiece(id);
     triggerVibration([20, 40, 20]);
     tutorial.notifyAction("dig");
+    checkLayerClearAndUnlock(currentLayerId);
   } else {
     addLog("这一格只有松土和碎砂。");
     timelineRecorder.recordDig(index, null, "normal");
@@ -3382,17 +3774,36 @@ function hideCompass() {
 function useHint() {
   if (!state.running) return;
   const template = artifactTemplates[currentTemplate];
-  const pieceIndices = Object.keys(template.buried).map(Number);
+  const currentLayerId = state.currentLayerId;
+  const buried = LAYER_HELPERS.getLayerBuried(template, currentLayerId);
+  const pieceIndices = Object.keys(buried).map(Number);
   const hidden = pieceIndices.filter(i => !state.dug.has(i) && !state.hintedCells.has(i));
   if (hidden.length === 0) {
-    addLog("没有可提示的碎片了。");
+    const layers = LAYER_HELPERS.getLayers(template);
+    let foundHint = false;
+    for (let li = 0; li < layers.length; li++) {
+      const layer = layers[li];
+      if (!LAYER_HELPERS.isLayerAccessible(template, layer.id, state.layerDug)) break;
+      const lBuried = LAYER_HELPERS.getLayerBuried(template, layer.id);
+      const lDug = state.layerDug.get(layer.id) || new Set();
+      const lHinted = state.layerHintedCells.get(layer.id) || new Set();
+      const lHidden = Object.keys(lBuried).map(Number).filter(i => !lDug.has(i) && !lHinted.has(i));
+      if (lHidden.length > 0) {
+        addLog(`当前层没有可提示的碎片，但其他层还有未发掘的碎片。可以尝试切换地层。`);
+        foundHint = true;
+        break;
+      }
+    }
+    if (!foundHint) {
+      addLog("没有可提示的碎片了。");
+    }
     return;
   }
   const targetIdx = hidden[Math.floor(SEEDED_RANDOM.next() * hidden.length)];
   state.hintedCells.add(targetIdx);
   state.hintsUsed += 1;
-  const def = template.pieceDefs.find(p => p.id === template.buried[targetIdx]);
-  addLog(`提示：${def ? def.label : "某件"}${template.pieceName}的位置已标记。`);
+  const def = template.pieceDefs.find(p => p.id === buried[targetIdx]);
+  addLog(`提示：${def ? def.label : "某件"}${template.pieceName}的位置已标记（位于${LAYER_HELPERS.getCurrentLayer(template, currentLayerId).name}）。`);
   timelineRecorder.recordHintUse(targetIdx);
   render();
 }
@@ -3456,19 +3867,30 @@ function cancelToolMode(renderLog = true) {
 function brushDig(index) {
   if (!state.running || state.dug.has(index) || state.lockedCells.has(index)) return;
   const template = artifactTemplates[currentTemplate];
+  const currentLayerId = state.currentLayerId;
+  const buried = LAYER_HELPERS.getLayerBuried(template, currentLayerId);
 
   state.dug.add(index);
   state.tools.brush -= 1;
   state.toolsUsed.brush += 1;
   state.activeTool = null;
 
-  if (template.buried[index]) {
-    const id = template.buried[index];
+  if (!state.layerRecords[currentLayerId]) {
+    state.layerRecords[currentLayerId] = { correctDigs: 0, totalDigs: 0, pieces: [] };
+  }
+  state.layerRecords[currentLayerId].totalDigs += 1;
+
+  if (buried[index]) {
+    const id = buried[index];
     state.found.add(id);
-    addLog(`[刷子] 安全清理出${template.pieceDefs.find((p) => p.id === id).label}${template.pieceName}。`);
+    state.layerRecords[currentLayerId].correctDigs += 1;
+    state.layerRecords[currentLayerId].pieces.push(id);
+    const pieceDef = template.pieceDefs.find((p) => p.id === id);
+    addLog(`[刷子] 安全清理出${pieceDef ? pieceDef.label : id}${template.pieceName}（出自${LAYER_HELPERS.getCurrentLayer(template, currentLayerId).name}）。`);
     timelineRecorder.recordDig(index, id, "brush");
     spawnPiece(id);
     tutorial.notifyAction("dig");
+    checkLayerClearAndUnlock(currentLayerId);
   } else {
     addLog("[刷子] 安全清理，这一格只有松土和碎砂。");
     timelineRecorder.recordDig(index, null, "brush");
@@ -3480,19 +3902,30 @@ function brushDig(index) {
 function trowelDig(index) {
   if (!state.running || state.dug.has(index) || state.lockedCells.has(index)) return;
   const template = artifactTemplates[currentTemplate];
+  const currentLayerId = state.currentLayerId;
+  const buried = LAYER_HELPERS.getLayerBuried(template, currentLayerId);
 
   state.dug.add(index);
   state.tools.trowel -= 1;
   state.toolsUsed.trowel += 1;
   state.activeTool = null;
 
-  if (template.buried[index]) {
-    const id = template.buried[index];
+  if (!state.layerRecords[currentLayerId]) {
+    state.layerRecords[currentLayerId] = { correctDigs: 0, totalDigs: 0, pieces: [] };
+  }
+  state.layerRecords[currentLayerId].totalDigs += 1;
+
+  if (buried[index]) {
+    const id = buried[index];
     state.found.add(id);
-    addLog(`[小手铲] 精确挖掘出${template.pieceDefs.find((p) => p.id === id).label}${template.pieceName}！`);
+    state.layerRecords[currentLayerId].correctDigs += 1;
+    state.layerRecords[currentLayerId].pieces.push(id);
+    const pieceDef = template.pieceDefs.find((p) => p.id === id);
+    addLog(`[小手铲] 精确挖掘出${pieceDef ? pieceDef.label : id}${template.pieceName}（出自${LAYER_HELPERS.getCurrentLayer(template, currentLayerId).name}）！`);
     timelineRecorder.recordDig(index, id, "trowel");
     spawnPiece(id);
     tutorial.notifyAction("dig");
+    checkLayerClearAndUnlock(currentLayerId);
   } else {
     addLog("[小手铲] 精确挖掘落空，这一格只有松土，返还1次刷子。");
     state.tools.brush = (state.tools.brush || 0) + 1;
@@ -4234,6 +4667,32 @@ function trySnap(piece) {
   renderStats();
 }
 
+function buildLayerAccuracyHtml(layerAccuracy) {
+  if (!layerAccuracy || !layerAccuracy.isMultiLayer || layerAccuracy.layerResults.length <= 1) {
+    return "";
+  }
+  const itemsHtml = layerAccuracy.layerResults.map((lr) => `
+    <div class="layer-accuracy-item">
+      <span class="layer-color-dot" style="background:${lr.layerColor}"></span>
+      <span class="layer-name">${lr.layerName}</span>
+      <span class="layer-pieces-info">碎片 ${lr.foundPieces}/${lr.expectedPieces} · 挖掘 ${lr.totalDigs}次</span>
+      <div class="layer-accuracy-bar">
+        <div class="layer-accuracy-fill" style="width:${lr.layerScore}%;background:${getScoreColor(lr.layerScore)}"></div>
+      </div>
+      <span class="layer-accuracy-score" style="color:${getScoreColor(lr.layerScore)}">${lr.layerScore}</span>
+    </div>
+  `).join("");
+
+  return `
+    <div class="settlement-layer-accuracy">
+      <h3>🏛️ 层位记录准确度（综合 ${layerAccuracy.overallLayerAccuracy}%）</h3>
+      <div class="layer-accuracy-list">
+        ${itemsHtml}
+      </div>
+    </div>
+  `;
+}
+
 function finish(success, message) {
   if (!state.running) return;
   state.running = false;
@@ -4327,7 +4786,14 @@ function finish(success, message) {
             <div class="score-bar"><div class="score-bar-fill" style="width:${scores.toolScore}%;background:${getScoreColor(scores.toolScore)}"></div></div>
             <div class="score-value" style="color:${getScoreColor(scores.toolScore)}">${scores.toolScore}</div>
           </div>
+          ${scores.layerAccuracy.isMultiLayer ? `
+          <div class="settlement-score-item">
+            <div class="score-label">层位记录</div>
+            <div class="score-bar"><div class="score-bar-fill" style="width:${scores.layerScore}%;background:${getScoreColor(scores.layerScore)}"></div></div>
+            <div class="score-value" style="color:${getScoreColor(scores.layerScore)}">${scores.layerScore}</div>
+          </div>` : ''}
         </div>
+        ${buildLayerAccuracyHtml(scores.layerAccuracy)}
         <div class="settlement-tools-used">
           <span class="tools-used-label">道具使用：</span>
           <span class="tool-used-item">📍 探针 ${state.toolsUsed.probe}</span>
@@ -4357,6 +4823,8 @@ function finish(success, message) {
       goals: goalResults,
       goalsAchieved: achievedGoalsCount,
       goalsTotal: goalsCount,
+      layerRecords: state.layerRecords,
+      layerAccuracy: scores.layerAccuracy,
       completedAt: Date.now(),
       randomSeed: state.randomSeed,
       timeline: timelineRecorder.getTimeline()
@@ -4404,7 +4872,14 @@ function finish(success, message) {
             <div class="score-bar"><div class="score-bar-fill" style="width:${scores.toolScore}%;background:${getScoreColor(scores.toolScore)}"></div></div>
             <div class="score-value" style="color:${getScoreColor(scores.toolScore)}">${scores.toolScore}</div>
           </div>
+          ${scores.layerAccuracy.isMultiLayer ? `
+          <div class="settlement-score-item">
+            <div class="score-label">层位记录</div>
+            <div class="score-bar"><div class="score-bar-fill" style="width:${scores.layerScore}%;background:${getScoreColor(scores.layerScore)}"></div></div>
+            <div class="score-value" style="color:${getScoreColor(scores.layerScore)}">${scores.layerScore}</div>
+          </div>` : ''}
         </div>
+        ${buildLayerAccuracyHtml(scores.layerAccuracy)}
         <div class="settlement-tools-used">
           <span class="tools-used-label">道具使用：</span>
           <span class="tool-used-item">📍 探针 ${state.toolsUsed.probe}</span>
@@ -4434,6 +4909,8 @@ function finish(success, message) {
       goals: goalResults,
       goalsAchieved: achievedGoalsCount,
       goalsTotal: goalsCount,
+      layerRecords: state.layerRecords,
+      layerAccuracy: scores.layerAccuracy,
       completedAt: Date.now(),
       randomSeed: state.randomSeed,
       timeline: timelineRecorder.getTimeline()
@@ -4486,6 +4963,7 @@ function triggerVibration(pattern) {
 
 function render() {
   renderStats();
+  renderLayerTabs();
   renderGrid();
   renderLog();
   renderTools();
@@ -4576,30 +5054,40 @@ function renderTools() {
 function renderGrid() {
   const template = artifactTemplates[currentTemplate];
   gridEl.innerHTML = "";
-  const gridSize = template.gridSize || 25;
+  const currentLayerId = state.currentLayerId;
+  const currentLayer = LAYER_HELPERS.getCurrentLayer(template, currentLayerId);
+  const gridSize = LAYER_HELPERS.getLayerGridSize(template, currentLayerId);
   const cols = Math.sqrt(gridSize);
+  const buried = LAYER_HELPERS.getLayerBuried(template, currentLayerId);
+  const isAccessible = LAYER_HELPERS.isLayerAccessible(template, currentLayerId, state.layerDug);
+
   gridEl.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
   gridEl.classList.toggle("brush-mode", state.activeTool === "brush");
   gridEl.classList.toggle("trowel-mode", state.activeTool === "trowel");
+  gridEl.classList.toggle("layer-grid", true);
   gridEl.setAttribute("role", "grid");
-  gridEl.setAttribute("aria-label", "探方格，使用方向键导航，回车键挖掘");
+  gridEl.setAttribute("aria-label", `${currentLayer.name}探方格，使用方向键导航，回车键挖掘`);
   gridEl.setAttribute("aria-rowcount", cols);
   gridEl.setAttribute("aria-colcount", cols);
+  gridEl.style.setProperty("--layer-color", currentLayer.color || "#c69a60");
+  gridEl.style.setProperty("--layer-bg", adjustBrightness(currentLayer.color || "#f5e6c8", 30));
+  gridEl.style.setProperty("--cell-bg", currentLayer.color || "#e7d4b1");
+  gridEl.style.setProperty("--cell-hover-bg", adjustBrightness(currentLayer.color || "#d4b896", -15));
 
   for (let i = 0; i < gridSize; i += 1) {
     const cell = document.createElement("button");
     cell.type = "button";
-    cell.className = "cell";
+    cell.className = "cell layer-cell";
     cell.dataset.index = i;
     const row = Math.floor(i / cols);
     const col = i % cols;
     cell.setAttribute("role", "gridcell");
     cell.setAttribute("aria-rowindex", row + 1);
     cell.setAttribute("aria-colindex", col + 1);
-    cell.setAttribute("aria-label", `第${row + 1}行第${col + 1}列`);
+    cell.setAttribute("aria-label", `${currentLayer.name}第${row + 1}行第${col + 1}列`);
 
     if (state.dug.has(i)) cell.classList.add("dug");
-    if (state.found.has(template.buried[i])) cell.classList.add("found");
+    if (state.found.has(buried[i])) cell.classList.add("found");
     if (state.lockedCells.has(i)) cell.classList.add("locked-cell");
     if (state.hintedCells.has(i) && !state.dug.has(i)) cell.classList.add("hinted");
     if (state.probeHints.has(i) && !state.dug.has(i)) cell.classList.add("probe-hinted");
@@ -4607,27 +5095,39 @@ function renderGrid() {
     if (state.activeTool === "trowel") cell.classList.add("trowel-mode");
 
     if (state.dug.has(i)) {
-      cell.textContent = template.buried[i] ? template.pieceName : "土";
-      cell.setAttribute("aria-label", `第${row + 1}行第${col + 1}列，已挖掘，${template.buried[i] ? "发现" + template.pieceName : "只有土"}`);
+      cell.textContent = buried[i] ? template.pieceName : "土";
+      cell.setAttribute("aria-label", `${currentLayer.name}第${row + 1}行第${col + 1}列，已挖掘，${buried[i] ? "发现" + template.pieceName : "只有土"}`);
     } else if (state.lockedCells.has(i)) {
       cell.textContent = "⚠";
-      cell.setAttribute("aria-label", `第${row + 1}行第${col + 1}列，已锁定，无法挖掘`);
+      cell.setAttribute("aria-label", `${currentLayer.name}第${row + 1}行第${col + 1}列，已锁定，无法挖掘`);
     } else if (state.hintedCells.has(i)) {
       cell.textContent = "?";
-      cell.setAttribute("aria-label", `第${row + 1}行第${col + 1}列，提示位置`);
+      cell.setAttribute("aria-label", `${currentLayer.name}第${row + 1}行第${col + 1}列，提示位置`);
     } else if (state.probeHints.has(i)) {
       cell.textContent = "◎";
-      cell.setAttribute("aria-label", `第${row + 1}行第${col + 1}列，探针标记`);
+      cell.setAttribute("aria-label", `${currentLayer.name}第${row + 1}行第${col + 1}列，探针标记`);
     } else {
       cell.textContent = "";
     }
-    cell.disabled = !state.running || state.dug.has(i) || state.lockedCells.has(i);
+    cell.disabled = !state.running || !isAccessible || state.dug.has(i) || state.lockedCells.has(i);
     cell.addEventListener("click", () => dig(i));
     cell.addEventListener("focus", () => {
       keyboardNav.focusedCellIndex = i;
       keyboardNav.activeRegion = "grid";
     });
     gridEl.appendChild(cell);
+  }
+
+  if (!isAccessible) {
+    const hint = document.createElement("div");
+    hint.className = "layer-locked-hint";
+    const layers = LAYER_HELPERS.getLayers(template);
+    const idx = layers.findIndex(l => l.id === currentLayerId);
+    if (idx > 0) {
+      const prevLayer = layers[idx - 1];
+      hint.textContent = `「${prevLayer.name}」尚未清理完毕，暂无法发掘此层`;
+    }
+    gridEl.parentNode.insertBefore(hint, gridEl.nextSibling);
   }
 
   if (keyboardNav.activeRegion === "grid") {
@@ -4640,6 +5140,20 @@ function renderGrid() {
       if (firstEnabled) firstEnabled.focus();
     }
   }
+}
+
+function adjustBrightness(hex, percent) {
+  const num = parseInt(hex.replace("#", ""), 16);
+  const amt = Math.round(2.55 * percent);
+  const R = (num >> 16) + amt;
+  const G = (num >> 8 & 0x00FF) + amt;
+  const B = (num & 0x0000FF) + amt;
+  return "#" + (
+    0x1000000 +
+    (R < 255 ? R < 1 ? 0 : R : 255) * 0x10000 +
+    (G < 255 ? G < 1 ? 0 : G : 255) * 0x100 +
+    (B < 255 ? B < 1 ? 0 : B : 255)
+  ).toString(16).slice(1);
 }
 
 function renderLog() {
@@ -4925,6 +5439,87 @@ const editor = {
 
     document.addEventListener("pointermove", (e) => this.handleSlotDragMove(e));
     document.addEventListener("pointerup", (e) => this.handleSlotDragEnd(e));
+
+    addListener("addLayerBtn", "click", () => this.createNewLayer());
+    addListener("removeLayerBtn", "click", () => this.removeCurrentLayer());
+
+    const layerNameEl = document.getElementById("editorLayerName");
+    if (layerNameEl) {
+      layerNameEl.addEventListener("input", (e) => {
+        const layer = this.getCurrentLayer();
+        if (layer) {
+          layer.name = e.target.value;
+          this.renderEditorLayerTabs();
+        }
+      });
+    }
+    const layerDescEl = document.getElementById("editorLayerDesc");
+    if (layerDescEl) {
+      layerDescEl.addEventListener("input", (e) => {
+        const layer = this.getCurrentLayer();
+        if (layer) layer.description = e.target.value;
+      });
+    }
+    const layerGridSizeEl = document.getElementById("editorLayerGridSize");
+    if (layerGridSizeEl) {
+      layerGridSizeEl.addEventListener("change", (e) => {
+        const layer = this.getCurrentLayer();
+        if (layer) {
+          const newSize = Number(e.target.value);
+          layer.gridSize = newSize;
+          Object.keys(layer.buried || {}).forEach((key) => {
+            if (Number(key) >= newSize) {
+              delete layer.buried[key];
+            }
+          });
+          this.renderEditorLayerTabs();
+          this.renderGrid();
+        }
+      });
+    }
+    const layerColorEl = document.getElementById("editorLayerColor");
+    if (layerColorEl) {
+      layerColorEl.addEventListener("input", (e) => {
+        const layer = this.getCurrentLayer();
+        if (layer) {
+          layer.color = e.target.value;
+          this.renderEditorLayerTabs();
+        }
+      });
+    }
+    const pieceLayerSelect = document.getElementById("editorPieceLayer");
+    if (pieceLayerSelect) {
+      pieceLayerSelect.addEventListener("change", (e) => {
+        if (!this.selectedPieceId || !this.state.layers) return;
+        const targetLayerId = e.target.value;
+        const targetLayer = this.state.layers.find(l => l.id === targetLayerId);
+        if (!targetLayer) return;
+        for (let i = 0; i < this.state.layers.length; i++) {
+          const l = this.state.layers[i];
+          Object.keys(l.buried || {}).forEach((k) => {
+            if (l.buried[k] === this.selectedPieceId) {
+              delete l.buried[k];
+            }
+          });
+        }
+        const size = targetLayer.gridSize || this.state.gridSize || 25;
+        const usedCells = new Set(Object.keys(targetLayer.buried || {}).map(Number));
+        let targetCell = -1;
+        for (let c = 0; c < size; c++) {
+          if (!usedCells.has(c)) {
+            targetCell = c;
+            break;
+          }
+        }
+        if (targetCell >= 0) {
+          if (!targetLayer.buried) targetLayer.buried = {};
+          targetLayer.buried[String(targetCell)] = this.selectedPieceId;
+        }
+        this.renderEditorLayerTabs();
+        this.renderGrid();
+        this.renderPieceList();
+      });
+    }
   },
 
   open(levelId = null) {
@@ -4932,7 +5527,7 @@ const editor = {
     if (levelId) {
       const customLevel = customLevelsStore.get(levelId);
       if (customLevel) {
-        this.state = JSON.parse(JSON.stringify(customLevel));
+        this.state = this.templateToEditorState(customLevel);
         this.editingLevelId = levelId;
       } else if (artifactTemplates[levelId]) {
         this.state = this.templateToEditorState(artifactTemplates[levelId]);
@@ -4963,6 +5558,29 @@ const editor = {
     } else if (template.target && template.target.style) {
       stylePreset = this.inferStylePreset(template);
     }
+    const hasLayers = template.layers && Array.isArray(template.layers) && template.layers.length > 0;
+    let layers;
+    if (hasLayers) {
+      layers = template.layers.map((layer, idx) => ({
+        id: layer.id || ("layer" + (idx + 1)),
+        name: layer.name || ("第" + (idx + 1) + "层"),
+        description: layer.description || "",
+        gridSize: layer.gridSize || template.gridSize || 25,
+        color: layer.color || DEFAULT_LAYER_COLORS[idx % DEFAULT_LAYER_COLORS.length],
+        eventWeights: JSON.parse(JSON.stringify(layer.eventWeights || {})),
+        buried: JSON.parse(JSON.stringify(layer.buried || {}))
+      }));
+    } else {
+      layers = [{
+        id: "layer1",
+        name: "文化层",
+        description: "",
+        gridSize: template.gridSize || 25,
+        color: DEFAULT_LAYER_COLORS[0],
+        eventWeights: {},
+        buried: JSON.parse(JSON.stringify(template.buried || {}))
+      }];
+    }
     return {
       isCustom: true,
       id: template.id,
@@ -4975,6 +5593,8 @@ const editor = {
       stylePreset: stylePreset,
       difficulty: template.difficulty || "自定义",
       buried: JSON.parse(JSON.stringify(template.buried || {})),
+      layers: layers,
+      currentEditorLayerIndex: 0,
       pieceDefs: JSON.parse(JSON.stringify(template.pieceDefs || [])),
       goals: JSON.parse(JSON.stringify(template.goals || {}))
     };
@@ -5057,9 +5677,73 @@ const editor = {
       stylePreset: "bowl",
       difficulty: "自定义",
       buried: {},
+      layers: [{
+        id: "layer1",
+        name: "文化层",
+        description: "",
+        gridSize: 25,
+        color: DEFAULT_LAYER_COLORS[0],
+        eventWeights: {},
+        buried: {}
+      }],
+      currentEditorLayerIndex: 0,
       pieceDefs: [],
       goals: {}
     };
+  },
+
+  getCurrentLayer() {
+    if (!this.state || !this.state.layers) return null;
+    return this.state.layers[this.state.currentEditorLayerIndex] || this.state.layers[0];
+  },
+
+  getCurrentLayerBuried() {
+    const layer = this.getCurrentLayer();
+    return layer ? layer.buried : this.state.buried;
+  },
+
+  getCurrentLayerGridSize() {
+    const layer = this.getCurrentLayer();
+    return layer ? (layer.gridSize || this.state.gridSize) : this.state.gridSize;
+  },
+
+  createNewLayer() {
+    if (!this.state.layers) this.state.layers = [];
+    const idx = this.state.layers.length;
+    const newLayer = {
+      id: "layer" + (idx + 1),
+      name: "第" + (idx + 1) + "层",
+      description: "",
+      gridSize: this.state.gridSize || 25,
+      color: DEFAULT_LAYER_COLORS[idx % DEFAULT_LAYER_COLORS.length],
+      eventWeights: {},
+      buried: {}
+    };
+    this.state.layers.push(newLayer);
+    this.state.currentEditorLayerIndex = idx;
+    this.syncUIFromState();
+    this.renderAll();
+  },
+
+  switchEditorLayer(index) {
+    if (!this.state.layers || index < 0 || index >= this.state.layers.length) return;
+    this.state.currentEditorLayerIndex = index;
+    this.syncUIFromState();
+    this.renderAll();
+  },
+
+  removeCurrentLayer() {
+    if (!this.state.layers || this.state.layers.length <= 1) {
+      alert("至少需要保留一个地层");
+      return;
+    }
+    const idx = this.state.currentEditorLayerIndex;
+    const layerName = this.state.layers[idx].name;
+    if (!confirm(`确定删除地层「${layerName}」吗？该层所有埋藏配置将丢失。`)) return;
+    this.state.layers.splice(idx, 1);
+    this.state.currentEditorLayerIndex = Math.max(0, idx - 1);
+    this.syncUIFromState();
+    this.renderAll();
   },
 
   syncUIFromState() {
@@ -5072,6 +5756,99 @@ const editor = {
     document.querySelectorAll(".style-preset-btn").forEach((btn) => {
       btn.classList.toggle("active", btn.dataset.style === (this.state.stylePreset || "bowl"));
     });
+    const currentLayer = this.getCurrentLayer();
+    if (currentLayer) {
+      const editorLayerName = document.getElementById("editorLayerName");
+      const editorLayerDesc = document.getElementById("editorLayerDesc");
+      const editorLayerGridSize = document.getElementById("editorLayerGridSize");
+      const editorLayerColor = document.getElementById("editorLayerColor");
+      if (editorLayerName) editorLayerName.value = currentLayer.name || "";
+      if (editorLayerDesc) editorLayerDesc.value = currentLayer.description || "";
+      if (editorLayerGridSize) editorLayerGridSize.value = String(currentLayer.gridSize || this.state.gridSize || 25);
+      if (editorLayerColor) editorLayerColor.value = currentLayer.color || DEFAULT_LAYER_COLORS[0];
+    }
+    this.renderEditorLayerTabs();
+    this.renderEventWeights();
+    this.renderEditorPieceLayerSelect();
+  },
+
+  renderEditorLayerTabs() {
+    const tabsContainer = document.getElementById("editorLayerTabs");
+    if (!tabsContainer || !this.state.layers) return;
+    tabsContainer.innerHTML = "";
+    this.state.layers.forEach((layer, idx) => {
+      const tab = document.createElement("button");
+      tab.type = "button";
+      tab.className = "editor-layer-tab" + (idx === this.state.currentEditorLayerIndex ? " active" : "");
+      const buriedCount = Object.keys(layer.buried || {}).length;
+      tab.innerHTML = `
+        <span class="editor-layer-tab-color" style="background:${layer.color || DEFAULT_LAYER_COLORS[idx % DEFAULT_LAYER_COLORS.length]}"></span>
+        <span class="editor-layer-tab-name">${layer.name || ("第" + (idx + 1) + "层")}</span>
+        <span class="editor-layer-tab-count">${buriedCount}片</span>
+      `;
+      tab.addEventListener("click", () => this.switchEditorLayer(idx));
+      tabsContainer.appendChild(tab);
+    });
+  },
+
+  renderEventWeights() {
+    const container = document.getElementById("editorEventWeights");
+    if (!container) return;
+    const currentLayer = this.getCurrentLayer();
+    if (!currentLayer) return;
+    if (!currentLayer.eventWeights) currentLayer.eventWeights = {};
+    const eventDefs = [
+      { id: "collapse", name: "塌方", desc: "探方边缘坍塌，影响挖掘效率" },
+      { id: "rain", name: "雨水", desc: "降雨导致土壤泥泞" },
+      { id: "sun_crack", name: "暴晒", desc: "烈日导致土壤干裂" },
+      { id: "wind", name: "大风", desc: "风沙干扰操作" },
+      { id: "find_coin", name: "古币", desc: "意外发现古钱币，加分事件" },
+      { id: "ancient_guide", name: "古迹指引", desc: "发现古人留下的标记" }
+    ];
+    container.innerHTML = eventDefs.map(def => {
+      const weight = currentLayer.eventWeights[def.id] !== undefined ? currentLayer.eventWeights[def.id] : 1.0;
+      return `
+        <div class="event-weight-item">
+          <div class="event-weight-info">
+            <span class="event-weight-name">${def.name}</span>
+            <span class="event-weight-desc">${def.desc}</span>
+          </div>
+          <div class="event-weight-control">
+            <input type="range" class="event-weight-slider" data-event="${def.id}" min="0" max="3" step="0.1" value="${weight}">
+            <span class="event-weight-value">${weight.toFixed(1)}×</span>
+          </div>
+        </div>
+      `;
+    }).join("");
+    container.querySelectorAll(".event-weight-slider").forEach(slider => {
+      slider.addEventListener("input", (e) => {
+        const eventId = e.target.dataset.event;
+        const val = parseFloat(e.target.value);
+        currentLayer.eventWeights[eventId] = val;
+        const valEl = e.target.parentElement.querySelector(".event-weight-value");
+        if (valEl) valEl.textContent = val.toFixed(1) + "×";
+      });
+    });
+  },
+
+  renderEditorPieceLayerSelect() {
+    const select = document.getElementById("editorPieceLayer");
+    if (!select || !this.state.layers) return;
+    const currentBuried = this.getCurrentLayerBuried();
+    const currentLayer = this.getCurrentLayer();
+    let foundLayer = currentLayer ? currentLayer.id : null;
+    if (this.selectedPieceId) {
+      for (let i = 0; i < this.state.layers.length; i++) {
+        const l = this.state.layers[i];
+        if (Object.values(l.buried || {}).includes(this.selectedPieceId)) {
+          foundLayer = l.id;
+          break;
+        }
+      }
+    }
+    select.innerHTML = this.state.layers.map((layer, idx) =>
+      `<option value="${layer.id}" ${layer.id === foundLayer ? "selected" : ""}>第${idx + 1}层 · ${layer.name}</option>`
+    ).join("");
   },
 
   renderAll() {
@@ -5179,8 +5956,17 @@ const editor = {
     const idx = this.state.pieceDefs.length;
     const id = "p" + (idx + 1);
     const label = DEFAULT_LABELS[idx] || `碎片${idx + 1}`;
-    const cols = Math.sqrt(this.state.gridSize);
-    const gridIdx = idx % this.state.gridSize;
+    const currentLayer = this.getCurrentLayer();
+    const currentSize = this.getCurrentLayerGridSize();
+    const currentBuried = this.getCurrentLayerBuried();
+    const usedCells = new Set(Object.keys(currentBuried || {}).map(Number));
+    let gridIdx = 0;
+    for (let c = 0; c < currentSize; c++) {
+      if (!usedCells.has(c)) {
+        gridIdx = c;
+        break;
+      }
+    }
     const slotX = 10 + (idx % 4) * 20;
     const slotY = 10 + Math.floor(idx / 4) * 20;
 
@@ -5191,7 +5977,12 @@ const editor = {
       angle: 0,
       initialAngle: Math.floor(Math.random() * 8) * 45
     });
-    this.state.buried[String(gridIdx)] = id;
+    if (currentLayer) {
+      if (!currentLayer.buried) currentLayer.buried = {};
+      currentLayer.buried[String(gridIdx)] = id;
+    } else {
+      this.state.buried[String(gridIdx)] = id;
+    }
     this.selectedPieceId = id;
     this.renderAll();
   },
@@ -5201,6 +5992,9 @@ const editor = {
     if (!confirm("确定要清空所有碎片吗？")) return;
     this.state.pieceDefs = [];
     this.state.buried = {};
+    if (this.state.layers) {
+      this.state.layers.forEach(l => { l.buried = {}; });
+    }
     this.selectedPieceId = null;
     this.renderAll();
   },
@@ -5212,6 +6006,13 @@ const editor = {
         delete this.state.buried[key];
       }
     });
+    if (this.state.layers) {
+      this.state.layers.forEach(l => {
+        Object.keys(l.buried || {}).forEach(k => {
+          if (l.buried[k] === pieceId) delete l.buried[k];
+        });
+      });
+    }
     if (this.selectedPieceId === pieceId) {
       this.selectedPieceId = this.state.pieceDefs.length > 0 ? this.state.pieceDefs[0].id : null;
     }
@@ -5323,7 +6124,15 @@ const editor = {
   },
 
   getPieceStatus(piece) {
-    const hasBuried = Object.values(this.state.buried).includes(piece.id);
+    let hasBuried = Object.values(this.state.buried).includes(piece.id);
+    if (!hasBuried && this.state.layers) {
+      for (const l of this.state.layers) {
+        if (Object.values(l.buried || {}).includes(piece.id)) {
+          hasBuried = true;
+          break;
+        }
+      }
+    }
     const hasSlot = piece.slot && piece.slot.x !== undefined && piece.slot.y !== undefined;
     if (!hasBuried && !hasSlot) return { type: "error", text: "未配置" };
     if (!hasBuried) return { type: "warn", text: "缺埋藏" };
@@ -5334,14 +6143,23 @@ const editor = {
   renderGrid() {
     const grid = document.getElementById("editorGrid");
     grid.innerHTML = "";
-    const size = this.state.gridSize;
+    const currentLayer = this.getCurrentLayer();
+    const size = this.getCurrentLayerGridSize();
+    const buried = this.getCurrentLayerBuried() || {};
     const cols = Math.sqrt(size);
     grid.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+    if (currentLayer) {
+      grid.style.setProperty("--layer-color", currentLayer.color || DEFAULT_LAYER_COLORS[0]);
+    }
 
     for (let i = 0; i < size; i++) {
       const cell = document.createElement("div");
       cell.className = "editor-cell";
-      const pieceId = this.state.buried[String(i)];
+      if (currentLayer) {
+        cell.style.background = `linear-gradient(135deg, ${currentLayer.color || "#d4b896"} 0%, ${adjustBrightness(currentLayer.color || "#d4b896", -15)} 100%)`;
+        cell.style.border = `1px solid ${adjustBrightness(currentLayer.color || "#d4b896", -30)}`;
+      }
+      const pieceId = buried[String(i)];
       if (pieceId) {
         cell.classList.add("has-piece");
         const piece = this.state.pieceDefs.find((p) => p.id === pieceId);
@@ -5360,22 +6178,33 @@ const editor = {
 
   handleGridCellClick(cellIdx) {
     const key = String(cellIdx);
-    if (this.state.buried[key]) {
-      const existingPieceId = this.state.buried[key];
+    const currentLayer = this.getCurrentLayer();
+    const buried = currentLayer ? (currentLayer.buried || (currentLayer.buried = {})) : this.state.buried;
+
+    if (buried[key]) {
+      const existingPieceId = buried[key];
       this.selectedPieceId = existingPieceId;
-      delete this.state.buried[key];
+      delete buried[key];
     } else {
       if (!this.selectedPieceId) {
         this.showHint("请先在左侧选择或添加一个碎片");
         return;
+      }
+      if (this.state.layers) {
+        this.state.layers.forEach(l => {
+          Object.keys(l.buried || {}).forEach(k => {
+            if (l.buried[k] === this.selectedPieceId) delete l.buried[k];
+          });
+        });
       }
       Object.keys(this.state.buried).forEach((k) => {
         if (this.state.buried[k] === this.selectedPieceId) {
           delete this.state.buried[k];
         }
       });
-      this.state.buried[key] = this.selectedPieceId;
+      buried[key] = this.selectedPieceId;
     }
+    this.renderEditorLayerTabs();
     this.renderGrid();
     this.renderPieceList();
   },
@@ -5489,8 +6318,43 @@ const editor = {
     if (this.state.pieceDefs.length === 0) {
       errors.push("至少需要添加 1 个碎片");
     }
-    if (this.state.pieceDefs.length > this.state.gridSize) {
-      errors.push(`碎片数量(${this.state.pieceDefs.length})不能超过探方格数(${this.state.gridSize})`);
+
+    const hasLayers = this.state.layers && this.state.layers.length > 0;
+    const allBuried = {};
+    const allLayerSizes = {};
+    if (hasLayers) {
+      this.state.layers.forEach((layer, lIdx) => {
+        if (!layer.name || layer.name.trim().length === 0) {
+          errors.push(`第 ${lIdx + 1} 个地层的名称不能为空`);
+        }
+        const size = layer.gridSize || this.state.gridSize || 25;
+        allLayerSizes[layer.id] = size;
+        Object.entries(layer.buried || {}).forEach(([k, v]) => {
+          allBuried[v] = { cell: k, layerId: layer.id, layerIdx: lIdx };
+        });
+        const cellSet = new Set();
+        Object.keys(layer.buried || {}).forEach(k => {
+          const n = Number(k);
+          if (n < 0 || n >= size) {
+            errors.push(`第 ${lIdx + 1} 层「${layer.name}」的探方格 ${k} 超出该层探方尺寸范围 (${size})`);
+          }
+          if (cellSet.has(k)) {
+            errors.push(`第 ${lIdx + 1} 层「${layer.name}」的探方格 ${k} 重复使用`);
+          }
+          cellSet.add(k);
+        });
+      });
+      const totalLayerSize = Object.values(allLayerSizes).reduce((s, v) => s + v, 0);
+      if (this.state.pieceDefs.length > totalLayerSize) {
+        errors.push(`碎片数量(${this.state.pieceDefs.length})不能超过所有地层探方总格数(${totalLayerSize})`);
+      }
+    } else {
+      if (this.state.pieceDefs.length > this.state.gridSize) {
+        errors.push(`碎片数量(${this.state.pieceDefs.length})不能超过探方格数(${this.state.gridSize})`);
+      }
+      Object.entries(this.state.buried).forEach(([k, v]) => {
+        allBuried[v] = { cell: k };
+      });
     }
 
     const usedCells = new Set();
@@ -5499,14 +6363,15 @@ const editor = {
       if (!piece.label || piece.label.trim().length === 0) {
         errors.push(`第 ${idx + 1} 个碎片的标签不能为空`);
       }
-      const buriedEntry = Object.entries(this.state.buried).find(([k, v]) => v === piece.id);
-      if (!buriedEntry) {
+      const buriedInfo = allBuried[piece.id];
+      if (!buriedInfo) {
         errors.push(`「${piece.label}」还没有设置埋藏位置`);
       } else {
-        if (usedCells.has(buriedEntry[0])) {
-          errors.push(`多个碎片使用了同一个探方格 ${buriedEntry[0]}`);
+        const cellKey = buriedInfo.layerId ? `${buriedInfo.layerId}:${buriedInfo.cell}` : buriedInfo.cell;
+        if (usedCells.has(cellKey)) {
+          errors.push(`多个碎片使用了同一个探方格 ${buriedInfo.cell}`);
         }
-        usedCells.add(buriedEntry[0]);
+        usedCells.add(cellKey);
         usedPieceIds.add(piece.id);
       }
       if (!piece.slot || piece.slot.x === undefined || piece.slot.y === undefined) {
@@ -5514,11 +6379,20 @@ const editor = {
       }
     });
 
-    Object.entries(this.state.buried).forEach(([cell, pid]) => {
-      if (!this.state.pieceDefs.find((p) => p.id === pid)) {
-        warnings.push(`探方格 ${cell} 埋藏的碎片 ${pid} 不存在于碎片列表`);
-      }
-    });
+    const checkOrphanBuried = (buriedObj, prefix = "") => {
+      Object.entries(buriedObj).forEach(([cell, pid]) => {
+        if (!this.state.pieceDefs.find((p) => p.id === pid)) {
+          warnings.push(`${prefix}探方格 ${cell} 埋藏的碎片 ${pid} 不存在于碎片列表`);
+        }
+      });
+    };
+    if (hasLayers) {
+      this.state.layers.forEach((layer, lIdx) => {
+        checkOrphanBuried(layer.buried || {}, `第 ${lIdx + 1} 层「${layer.name}」`);
+      });
+    } else {
+      checkOrphanBuried(this.state.buried);
+    }
 
     if (this.state.snapRadius < 40) {
       warnings.push("贴合半径过小，可能导致碎片难以吸附");
@@ -5600,7 +6474,8 @@ const editor = {
       jade: "custom-icon"
     };
 
-    return {
+    const hasLayers = state.layers && Array.isArray(state.layers) && state.layers.length > 0;
+    const result = {
       id: state.id || ("custom_" + Date.now()),
       isCustom: true,
       name: state.name || "自定义关卡",
@@ -5618,10 +6493,32 @@ const editor = {
       piece: {
         style: preset.piece
       },
-      buried: JSON.parse(JSON.stringify(state.buried)),
       pieceDefs: JSON.parse(JSON.stringify(state.pieceDefs)),
       goals: JSON.parse(JSON.stringify(state.goals || {}))
     };
+
+    if (hasLayers) {
+      result.layers = state.layers.map(layer => ({
+        id: layer.id,
+        name: layer.name,
+        description: layer.description || "",
+        gridSize: layer.gridSize || state.gridSize || 25,
+        color: layer.color,
+        eventWeights: JSON.parse(JSON.stringify(layer.eventWeights || {})),
+        buried: JSON.parse(JSON.stringify(layer.buried || {}))
+      }));
+      const mergedBuried = {};
+      state.layers.forEach(layer => {
+        Object.entries(layer.buried || {}).forEach(([k, v]) => {
+          mergedBuried[k] = v;
+        });
+      });
+      result.buried = mergedBuried;
+    } else {
+      result.buried = JSON.parse(JSON.stringify(state.buried));
+    }
+
+    return result;
   },
 
   preview() {
@@ -5768,24 +6665,23 @@ const editor = {
       });
     }
 
-    if (data.buried) {
+    const hasLayers = data.layers && Array.isArray(data.layers) && data.layers.length > 0;
+    let layers = null;
+
+    const cleanBuried = (buriedObj, layerSize, layerName = "") => {
       const validPieceIds = new Set(data.pieceDefs ? data.pieceDefs.map((p) => p.id) : []);
       const validBurials = [];
       const burialCounts = {};
       const pieceBurialCounts = {};
-      const sizeChanged = originalGridSize !== gridSize;
 
-      Object.entries(data.buried).forEach(([cell, pid]) => {
+      Object.entries(buriedObj || {}).forEach(([cell, pid]) => {
         const cellNum = Number(cell);
-        if (isNaN(cellNum) || cellNum < 0 || cellNum >= gridSize) {
-          const origHint = sizeChanged
-            ? `（原尺寸 ${originalGridSize} 已修正为 ${gridSize}）`
-            : "";
-          issues.push(`埋藏位置 ${cell} 超出探方范围（0~${gridSize - 1}）${origHint}，该埋藏将被移除`);
+        if (isNaN(cellNum) || cellNum < 0 || cellNum >= layerSize) {
+          issues.push(`${layerName}埋藏位置 ${cell} 超出探方范围（0~${layerSize - 1}），该埋藏将被移除`);
           return;
         }
         if (!validPieceIds.has(pid)) {
-          warnings.push(`埋藏位置 ${cell} 引用了不存在的碎片 ${pid}，该引用将被忽略`);
+          warnings.push(`${layerName}埋藏位置 ${cell} 引用了不存在的碎片 ${pid}，该引用将被忽略`);
           return;
         }
         if (!burialCounts[cell]) burialCounts[cell] = [];
@@ -5801,7 +6697,7 @@ const editor = {
             const piece = data.pieceDefs.find((p) => p.id === pid);
             return piece ? piece.label : pid;
           });
-          issues.push(`探方格 ${cell} 存在 ${pids.length} 个碎片埋藏冲突（${labels.join("、")}），仅保留最后一个`);
+          issues.push(`${layerName}探方格 ${cell} 存在 ${pids.length} 个碎片埋藏冲突（${labels.join("、")}），仅保留最后一个`);
         }
       });
 
@@ -5809,7 +6705,7 @@ const editor = {
         if (cells.length > 1) {
           const piece = data.pieceDefs.find((p) => p.id === pid);
           const label = piece ? piece.label : pid;
-          issues.push(`碎片「${label}」在 ${cells.length} 个探方格重复埋藏（${cells.join("、")}），仅保留位置 ${cells[cells.length - 1]}`);
+          issues.push(`${layerName}碎片「${label}」在 ${cells.length} 个探方格重复埋藏，仅保留位置 ${cells[cells.length - 1]}`);
         }
       });
 
@@ -5821,17 +6717,48 @@ const editor = {
       const cleanedBuried = {};
       validBurials.forEach(([cell, pid]) => {
         const cellNum = Number(cell);
-        if (cellNum < 0 || cellNum >= gridSize) return;
+        if (cellNum < 0 || cellNum >= layerSize) return;
         if (!validPieceIds.has(pid)) return;
         if (lastCellByPieceId[pid] !== cell) return;
         cleanedBuried[cell] = pid;
       });
-      data.buried = cleanedBuried;
+      return cleanedBuried;
+    };
+
+    if (hasLayers) {
+      layers = data.layers.map((layer, idx) => {
+        let lSize = layer.gridSize || gridSize;
+        if (!validGridSizes.includes(lSize)) {
+          issues.push(`第 ${idx + 1} 层「${layer.name || "未命名层"}」的探方尺寸 ${lSize} 不合法，将修正为 25`);
+          lSize = 25;
+        }
+        const cleanedBuried = cleanBuried(layer.buried, lSize, `第 ${idx + 1} 层「${layer.name || "未命名层"}」`);
+        return {
+          id: layer.id || ("layer" + (idx + 1)),
+          name: layer.name || ("第" + (idx + 1) + "层"),
+          description: layer.description || "",
+          gridSize: lSize,
+          color: layer.color || DEFAULT_LAYER_COLORS[idx % DEFAULT_LAYER_COLORS.length],
+          eventWeights: JSON.parse(JSON.stringify(layer.eventWeights || {})),
+          buried: cleanedBuried
+        };
+      });
+    } else {
+      if (data.buried) {
+        data.buried = cleanBuried(data.buried, gridSize);
+      }
     }
 
+    const pieceHasBuriedMap = {};
+    if (layers) {
+      layers.forEach(l => {
+        Object.values(l.buried || {}).forEach(pid => { pieceHasBuriedMap[pid] = true; });
+      });
+    } else {
+      Object.values(data.buried || {}).forEach(pid => { pieceHasBuriedMap[pid] = true; });
+    }
     data.pieceDefs.forEach((piece) => {
-      const hasBuried = Object.values(data.buried).includes(piece.id);
-      if (!hasBuried) {
+      if (!pieceHasBuriedMap[piece.id]) {
         warnings.push(`碎片「${piece.label}」没有埋藏位置，需手动在探方编辑中设置`);
       }
     });
@@ -5857,9 +6784,22 @@ const editor = {
       stylePreset: stylePreset,
       difficulty: data.difficulty || "自定义",
       buried: data.buried || {},
+      layers: layers,
+      currentEditorLayerIndex: 0,
       pieceDefs: data.pieceDefs || [],
       goals: data.goals || {}
     };
+    if (!state.layers) {
+      state.layers = [{
+        id: "layer1",
+        name: "文化层",
+        description: "",
+        gridSize: gridSize,
+        color: DEFAULT_LAYER_COLORS[0],
+        eventWeights: {},
+        buried: JSON.parse(JSON.stringify(state.buried || {}))
+      }];
+    }
 
     return { state, issues, warnings };
   },

@@ -70,6 +70,10 @@
               <h4 class="preview-section-title">🎯 修复目标</h4>
               <div id="previewGoals" class="preview-goals"></div>
             </div>
+            <div class="preview-section" id="previewLayersSection">
+              <h4 class="preview-section-title">🏛️ 文化层</h4>
+              <div id="previewLayers" class="preview-layers"></div>
+            </div>
             <div class="preview-actions">
               <button id="previewToggleModeBtn" type="button" class="preview-toggle-mode-btn hidden">🔄 切换练习/正式模式</button>
               <button id="previewStartBtn" type="button" class="preview-start-btn">🎮 开始修复</button>
@@ -153,10 +157,52 @@
         </div>
 
         <div class="editor-panel">
+          <h3>🏛️ 文化层配置 <span class="layer-count-badge" id="layerCountBadge">1</span></h3>
+          <p class="editor-hint">配置多个文化层，每层独立的探方网格、埋藏和事件。上层清理完毕后才能发掘下层。</p>
+          <div class="editor-layer-actions">
+            <button id="addLayerBtn" type="button" class="editor-btn">+ 添加地层</button>
+            <button id="removeLayerBtn" type="button" class="editor-btn danger">- 删除当前层</button>
+          </div>
+          <div id="editorLayerTabs" class="editor-layer-tabs"></div>
+          <div class="form-group" style="margin-top:12px;">
+            <label for="editorLayerName">地层名称</label>
+            <input type="text" id="editorLayerName" maxlength="15" placeholder="例如：表土层、文化层A">
+          </div>
+          <div class="form-group">
+            <label for="editorLayerDesc">地层说明</label>
+            <textarea id="editorLayerDesc" rows="2" maxlength="100" placeholder="该层的年代、土质、特点说明..."></textarea>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="editorLayerGridSize">本层探方尺寸</label>
+              <select id="editorLayerGridSize">
+                <option value="16">4 × 4</option>
+                <option value="25" selected>5 × 5</option>
+                <option value="36">6 × 6</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="editorLayerColor">土层颜色</label>
+              <input type="color" id="editorLayerColor" value="#d4b896">
+            </div>
+          </div>
+          <div class="form-group">
+            <label>随机事件权重调整</label>
+            <div class="event-weight-list" id="eventWeightList"></div>
+          </div>
+        </div>
+
+        <div class="editor-panel">
           <h3>碎片管理 <span class="piece-count-badge" id="pieceCountBadge">0</span></h3>
           <div class="editor-piece-actions">
             <button id="addPieceBtn" type="button" class="editor-btn">+ 添加碎片</button>
             <button id="clearPiecesBtn" type="button" class="editor-btn danger">清空碎片</button>
+          </div>
+          <div class="form-group" style="margin-top:12px;">
+            <label for="editorPieceLayer">所属地层</label>
+            <select id="editorPieceLayer">
+              <option value="0">第 1 层</option>
+            </select>
           </div>
           <div id="pieceListEditor" class="piece-list-editor"></div>
         </div>
@@ -249,6 +295,11 @@
           </div>
         </div>
         <p id="levelDescription" class="level-description hidden"></p>
+
+        <div id="layerPanel" class="layer-panel hidden">
+          <div class="layer-tabs" id="layerTabs" role="tablist" aria-label="地层切换"></div>
+          <div class="layer-info" id="layerInfo"></div>
+        </div>
 
         <div class="tools-panel">
           <button id="probeBtn" type="button" class="tool-btn" data-tool="probe">
