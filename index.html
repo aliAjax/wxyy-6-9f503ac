@@ -16,6 +16,7 @@
       <div class="header-actions">
         <button id="archiveBtn" type="button" class="archive-btn">修复档案</button>
         <button id="tutorialBtn" type="button" class="tutorial-btn">📖 教学</button>
+        <button id="settingsBtn" type="button" class="settings-btn">⚙️ 设置</button>
         <div class="stats">
           <span>时间 <strong id="timeLeft">90</strong></span>
           <span>挖掘 <strong id="digCount">0</strong></span>
@@ -273,6 +274,49 @@
     </div>
   </div>
 
+  <div id="settingsModal" class="modal hidden">
+    <div class="modal-content settings-modal-content">
+      <div class="modal-header">
+        <h2>⚙️ 游戏设置</h2>
+        <button id="closeSettingsBtn" type="button" class="close-btn">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="settings-group">
+          <div class="setting-item">
+            <div class="setting-info">
+              <div class="setting-label">现场事件提示动画</div>
+              <div class="setting-desc">随机事件触发时显示浮动提示动画</div>
+            </div>
+            <label class="toggle-switch">
+              <input type="checkbox" id="settingEventAnim" checked>
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+          <div class="setting-item">
+            <div class="setting-info">
+              <div class="setting-label">移动端震动反馈</div>
+              <div class="setting-desc">拖拽碎片时提供触觉反馈（仅移动设备）</div>
+            </div>
+            <label class="toggle-switch">
+              <input type="checkbox" id="settingVibration" checked>
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+          <div class="setting-item">
+            <div class="setting-info">
+              <div class="setting-label">教学自动弹出</div>
+              <div class="setting-desc">首次进入关卡时自动展示新手教学</div>
+            </div>
+            <label class="toggle-switch">
+              <input type="checkbox" id="settingAutoTutorial" checked>
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div id="confirmModal" class="modal hidden">
     <div class="modal-content confirm-modal">
       <div class="modal-body">
@@ -284,6 +328,8 @@
       </div>
     </div>
   </div>
+
+  <div id="eventNotifContainer" class="event-notif-container"></div>
 
   <script src="app.js"></script>
 </body>

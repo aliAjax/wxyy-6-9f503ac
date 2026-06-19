@@ -74,7 +74,47 @@ let gestureState = {
 
 const ARCHIVE_STORAGE_KEY = "archaeology_archive_records";
 const TUTORIAL_STORAGE_KEY = "archaeology_tutorial_done";
+const SETTINGS_STORAGE_KEY = "archaeology_game_settings";
 const RATING_ORDER = { S: 5, A: 4, B: 3, C: 2, D: 1, F: 0 };
+
+const gameSettings = {
+  _defaults: {
+    eventAnim: true,
+    vibration: true,
+    autoTutorial: true
+  },
+  _cache: null,
+  load() {
+    if (this._cache) return this._cache;
+    try {
+      const data = localStorage.getItem(SETTINGS_STORAGE_KEY);
+      this._cache = data ? { ...this._defaults, ...JSON.parse(data) } : { ...this._defaults };
+    } catch (e) {
+      this._cache = { ...this._defaults };
+    }
+    return this._cache;
+  },
+  save() {
+    try {
+      localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(this._cache));
+    } catch (e) {
+      console.error("保存设置失败:", e);
+    }
+  },
+  get(key) {
+    return this.load()[key];
+  },
+  set(key, value) {
+    this.load()[key] = value;
+    this.save();
+  },
+  syncUI() {
+    const s = this.load();
+    document.getElementById("settingEventAnim").checked = s.eventAnim;
+    document.getElementById("settingVibration").checked = s.vibration;
+    document.getElementById("settingAutoTutorial").checked = s.autoTutorial;
+  }
+};
 
 const SITE_EVENTS = {
   collapse: {
@@ -937,6 +977,7 @@ function tryTriggerEvent() {
 
         if (!result.silent) {
           addLog(result.message);
+          showEventNotif(evt, result.message);
         }
 
         state.eventCooldowns[evt.id] = evt.cooldown;
@@ -1241,6 +1282,29 @@ function init() {
   cancelClearBtn.addEventListener("click", closeConfirmModal);
   confirmClearBtn.addEventListener("click", clearArchive);
 
+  const settingsModal = document.getElementById("settingsModal");
+  const settingsBtn = document.getElementById("settingsBtn");
+  const closeSettingsBtn = document.getElementById("closeSettingsBtn");
+  settingsBtn.addEventListener("click", () => {
+    gameSettings.syncUI();
+    settingsModal.classList.remove("hidden");
+  });
+  closeSettingsBtn.addEventListener("click", () => {
+    settingsModal.classList.add("hidden");
+  });
+  settingsModal.addEventListener("click", (e) => {
+    if (e.target === settingsModal) settingsModal.classList.add("hidden");
+  });
+  document.getElementById("settingEventAnim").addEventListener("change", (e) => {
+    gameSettings.set("eventAnim", e.target.checked);
+  });
+  document.getElementById("settingVibration").addEventListener("change", (e) => {
+    gameSettings.set("vibration", e.target.checked);
+  });
+  document.getElementById("settingAutoTutorial").addEventListener("change", (e) => {
+    gameSettings.set("autoTutorial", e.target.checked);
+  });
+
   probeBtn.addEventListener("click", () => useTool("probe"));
   brushBtn.addEventListener("click", () => useTool("brush"));
   compassBtn.addEventListener("click", () => useTool("compass"));
@@ -1317,6 +1381,8 @@ function init() {
 
   updateIsMobile();
 
+  gameSettings.syncUI();
+
   resetStatsDisplay();
   levelSelectEl.classList.remove("hidden");
   gameAreaEl.classList.add("hidden");
@@ -1346,7 +1412,7 @@ function selectLevel(templateId, skipAutoTutorial = false) {
   resetStatsDisplay(templateId);
   render();
 
-  if (!skipAutoTutorial && !tutorial.isDone() && !tutorial.active) {
+  if (!skipAutoTutorial && gameSettings.get("autoTutorial") && !tutorial.isDone() && !tutorial.active) {
     setTimeout(() => tutorial.start(), 400);
   }
 }
@@ -1492,6 +1558,7 @@ function dig(index) {
     state.found.add(id);
     addLog(`挖到了${template.pieceDefs.find((p) => p.id === id).label}${template.pieceName}。`);
     spawnPiece(id);
+    triggerVibration([20, 40, 20]);
     tutorial.notifyAction("dig");
   } else {
     addLog("这一格只有松土和碎砂。");
@@ -1754,6 +1821,7 @@ function startDrag(event) {
   piece.addEventListener("pointerup", endDrag, { once: true });
   piece.addEventListener("pointercancel", endDrag, { once: true });
   preventPageScroll(true);
+  triggerVibration(15);
 }
 
 function dragMove(event) {
@@ -2050,6 +2118,7 @@ function trySnap(piece) {
       piece.style.background = template.piece.style.lockedBackground;
       state.locked.add(id);
       addLog(`${def.label}${template.pieceName}贴合成功。`);
+      triggerVibration([10, 30, 10]);
       tutorial.notifyAction("snap");
       if (selectedPiece === piece) {
         selectedPiece = null;
@@ -2225,6 +2294,34 @@ function finish(success, message) {
 function addLog(text) {
   state.log.push(text);
   state.log = state.log.slice(-30);
+}
+
+const eventNotifContainer = document.getElementById("eventNotifContainer");
+
+function showEventNotif(evt, message) {
+  if (!gameSettings.get("eventAnim")) return;
+  const notif = document.createElement("div");
+  notif.className = `event-notif event-${evt.type}`;
+  const icon = evt.type === "positive" ? "✦" : "⚡";
+  notif.innerHTML = `
+    <div class="event-notif-header">
+      <span class="event-notif-icon">${icon}</span>
+      <span class="event-notif-name">${evt.name}</span>
+    </div>
+    <div class="event-notif-msg">${message}</div>
+  `;
+  eventNotifContainer.appendChild(notif);
+  setTimeout(() => {
+    notif.classList.add("fade-out");
+    notif.addEventListener("animationend", () => notif.remove());
+  }, 3500);
+}
+
+function triggerVibration(pattern) {
+  if (!gameSettings.get("vibration")) return;
+  if (navigator.vibrate) {
+    navigator.vibrate(pattern);
+  }
 }
 
 function render() {
@@ -3706,6 +3803,7 @@ tryTriggerEvent = function() {
         }
         if (!result.silent) {
           addLog(result.message);
+          showEventNotif(evt, result.message);
         }
         state.eventCooldowns[evt.id] = evt.cooldown;
 
