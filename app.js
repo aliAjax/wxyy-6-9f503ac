@@ -3933,13 +3933,15 @@ const editor = {
   inspectImportData(data) {
     const issues = [];
     const warnings = [];
-    const gridSize = data.gridSize || 25;
     const validGridSizes = [16, 25, 36];
+    const originalGridSize = data.gridSize;
+    let gridSize = data.gridSize || 25;
     if (!validGridSizes.includes(gridSize)) {
       issues.push(`探方尺寸 ${gridSize} 不是合法值（允许 16/25/36），将自动修正为 25`);
+      gridSize = 25;
       data.gridSize = 25;
     }
-    const cols = Math.sqrt(data.gridSize);
+    const cols = Math.sqrt(gridSize);
 
     const stylePreset = this.inferStylePreset(data);
     const styleLabelMap = { bowl: "陶碗", tile: "瓦当", mirror: "铜镜", jade: "玉器" };
@@ -3991,34 +3993,45 @@ const editor = {
     }
 
     if (data.buried) {
+      const validPieceIds = new Set(data.pieceDefs ? data.pieceDefs.map((p) => p.id) : []);
       const burialCounts = {};
+      const sizeChanged = originalGridSize !== gridSize;
+
       Object.entries(data.buried).forEach(([cell, pid]) => {
         const cellNum = Number(cell);
         if (isNaN(cellNum) || cellNum < 0 || cellNum >= gridSize) {
-          issues.push(`埋藏位置 ${cell} 超出探方范围（0~${gridSize - 1}），该埋藏将被移除`);
-        } else {
-          if (!burialCounts[cell]) burialCounts[cell] = [];
-          burialCounts[cell].push(pid);
+          const origHint = sizeChanged
+            ? `（原尺寸 ${originalGridSize} 已修正为 ${gridSize}）`
+            : "";
+          issues.push(`埋藏位置 ${cell} 超出探方范围（0~${gridSize - 1}）${origHint}，该埋藏将被移除`);
+          return;
         }
-        if (!data.pieceDefs.find((p) => p.id === pid)) {
+        if (!validPieceIds.has(pid)) {
           warnings.push(`埋藏位置 ${cell} 引用了不存在的碎片 ${pid}，该引用将被忽略`);
+          return;
         }
+        if (!burialCounts[cell]) burialCounts[cell] = [];
+        burialCounts[cell].push(pid);
       });
+
       Object.entries(burialCounts).forEach(([cell, pids]) => {
         if (pids.length > 1) {
-          issues.push(`探方格 ${cell} 存在 ${pids.length} 个碎片埋藏冲突（${pids.join("、")}），仅保留最后一个`);
+          const labels = pids.map((pid) => {
+            const piece = data.pieceDefs.find((p) => p.id === pid);
+            return piece ? piece.label : pid;
+          });
+          issues.push(`探方格 ${cell} 存在 ${pids.length} 个碎片埋藏冲突（${labels.join("、")}），仅保留最后一个`);
         }
       });
 
       const cleanedBuried = {};
-      const seenCells = {};
       Object.entries(data.buried).forEach(([cell, pid]) => {
         const cellNum = Number(cell);
         if (cellNum < 0 || cellNum >= gridSize) return;
-        if (!data.pieceDefs.find((p) => p.id === pid)) return;
-        seenCells[cell] = pid;
+        if (!validPieceIds.has(pid)) return;
+        cleanedBuried[cell] = pid;
       });
-      data.buried = seenCells;
+      data.buried = cleanedBuried;
     }
 
     data.pieceDefs.forEach((piece) => {
@@ -4043,7 +4056,7 @@ const editor = {
       name: data.name || "",
       description: data.description || "",
       timeLimit: data.timeLimit || 120,
-      gridSize: data.gridSize || 25,
+      gridSize: gridSize,
       pieceName: data.pieceName || "碎片",
       snapRadius: data.snapRadius || 60,
       stylePreset: stylePreset,
