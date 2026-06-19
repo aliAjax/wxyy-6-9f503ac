@@ -989,7 +989,7 @@ function calculateOverallStats(records, filter = "all") {
 
 let currentStatsFilter = "all";
 
-function renderStatsOverview() {
+function renderArchiveStatsOverview() {
   const records = archive.load();
   const overallStats = calculateOverallStats(records, currentStatsFilter);
 
@@ -1031,7 +1031,7 @@ function renderStatsOverview() {
   statsOverviewEl.appendChild(overview);
 }
 
-function renderStatsLevelList() {
+function renderArchiveStatsLevelList() {
   const records = archive.load();
   const overallStats = calculateOverallStats(records, currentStatsFilter);
 
@@ -1123,9 +1123,9 @@ function renderStatsLevelList() {
   }
 }
 
-function renderStats() {
-  renderStatsOverview();
-  renderStatsLevelList();
+function renderArchiveStats() {
+  renderArchiveStatsOverview();
+  renderArchiveStatsLevelList();
 }
 
 function formatDateTime(timestamp) {
@@ -1315,7 +1315,7 @@ function openArchive() {
   renderBestRecords();
   currentStatsFilter = "all";
   updateFilterButtons();
-  renderStats();
+  renderArchiveStats();
   archiveModal.classList.remove("hidden");
 }
 
@@ -1335,7 +1335,7 @@ function clearArchive() {
   archive.clear();
   renderRecentRecords();
   renderBestRecords();
-  renderStats();
+  renderArchiveStats();
   closeConfirmModal();
 }
 
@@ -1353,7 +1353,7 @@ function switchArchiveTab(tabName) {
     c.classList.toggle("active", c.id === `${tabName}Tab`);
   });
   if (tabName === "stats") {
-    renderStats();
+    renderArchiveStats();
   }
 }
 
@@ -2025,7 +2025,7 @@ function init() {
     btn.addEventListener("click", () => {
       currentStatsFilter = btn.dataset.filter;
       updateFilterButtons();
-      renderStats();
+      renderArchiveStats();
     });
   });
 
